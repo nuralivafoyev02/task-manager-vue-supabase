@@ -4,6 +4,11 @@ export type TaskPriority = 'low' | 'medium' | 'high'
 export type UserRole = 'employee' | 'manager'
 export type AppLanguage = 'uz' | 'ru' | 'uz_cyrl'
 export type PerformanceMode = 'balanced' | 'compact'
+export type ViewKey = 'dashboard' | 'tasks' | 'employees' | 'calendar' | 'settings'
+export type StatusFilter = 'all' | PersistedTaskStatus | 'overdue'
+export type ThemeMode = 'light' | 'dark'
+export type ToastType = 'success' | 'error' | 'info'
+export type ToastItem = { id: number; type: ToastType; message: string; startX?: number }
 
 export interface Profile {
   id: string

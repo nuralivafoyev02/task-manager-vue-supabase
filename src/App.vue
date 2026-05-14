@@ -1,5 +1,11 @@
 <script setup lang="ts">
 import { computed, onMounted, reactive, ref, watch } from 'vue'
+import { STORAGE_KEYS, VIEW_KEYS } from './appConfig'
+import CancelTaskModal from './components/CancelTaskModal.vue'
+import StatusBadge from './components/StatusBadge.vue'
+import ToastStack from './components/ToastStack.vue'
+import { useToasts } from './composables/useToasts'
+import { localeName as getLocaleName, translate } from './i18n'
 import { isSupabaseConfigured, supabase } from './lib/supabase'
 import {
   createEmployee,
@@ -19,6 +25,13 @@ import {
   updateTaskStatus,
   upsertProfile
 } from './services/taskService'
+import {
+  displayTelegram,
+  formatDate,
+  formatDay as formatDayNumber,
+  getInitialsFromName,
+  toIsoDate
+} from './utils/formatters'
 import type {
   ActivityItem,
   AppLanguage,
@@ -26,383 +39,19 @@ import type {
   PerformanceMode,
   PersistedTaskStatus,
   Profile,
+  StatusFilter,
   Task,
   TaskPriority,
   TaskStatus,
-  UserRole
+  ThemeMode,
+  UserRole,
+  ViewKey
 } from './types'
 
-type ViewKey = 'dashboard' | 'tasks' | 'employees' | 'calendar' | 'settings'
-type StatusFilter = 'all' | PersistedTaskStatus | 'overdue'
-type ThemeMode = 'light' | 'dark'
-type ToastType = 'success' | 'error' | 'info'
-type ToastItem = { id: number; type: ToastType; message: string; startX?: number }
+const savedView = localStorage.getItem(STORAGE_KEYS.activeView) as ViewKey | null
+const savedTheme = localStorage.getItem(STORAGE_KEYS.theme) as ThemeMode | null
 
-const viewKeys: ViewKey[] = ['dashboard', 'tasks', 'employees', 'calendar', 'settings']
-const savedView = localStorage.getItem('task-manager-active-view') as ViewKey | null
-const savedTheme = localStorage.getItem('task-manager-theme') as ThemeMode | null
-
-const copy: Record<AppLanguage, Record<string, string>> = {
-  uz: {
-    appName: 'Task Manager',
-    loginTitle: 'Tizimga kirish',
-    loginHelp: 'Rahbar bergan login va parol bilan kiring.',
-    email: 'Login',
-    password: 'Parol',
-    signIn: 'Kirish',
-    dashboard: 'Dashboard',
-    tasks: 'Vazifalar',
-    employees: 'Xodimlar',
-    calendar: 'Kalendar',
-    settings: 'Sozlamalar',
-    newTask: 'Yangi vazifa',
-    saveTask: 'Vazifani saqlash',
-    editTask: 'Vazifani tahrirlash',
-    cancelTask: 'Bekor qilish',
-    actions: 'Amallar',
-    createEmployee: 'Xodim yaratish',
-    saveProfile: 'Profilni saqlash',
-    search: 'Qidirish',
-    refresh: 'Yangilash',
-    logout: 'Chiqish',
-    today: 'Bugun',
-    active: 'Faol',
-    completed: 'Bajarilgan',
-    canceled: 'Bekor qilingan',
-    overdue: 'Kechikkan',
-    assignee: 'Biriktirilgan',
-    dueDate: 'Muddat',
-    priority: 'Ustuvorlik',
-    status: 'Status',
-    title: 'Vazifa nomi',
-    description: 'Izoh',
-    cancelReason: 'Bekor qilish izohi',
-    cancelReasonHelp: 'Vazifa nima sababdan bekor qilinayotganini yozing.',
-    cancelReasonPlaceholder: 'Masalan: mijoz javob bermadi yoki vazifa dolzarbligini yo‘qotdi',
-    cancelReasonRequired: 'Bekor qilish izohini kiriting.',
-    cancelReasonEmpty: 'Bekor qilish izohi kiritilmagan.',
-    confirmCancel: 'Bekor qilishni tasdiqlash',
-    checklist: 'Checklist',
-    fullName: 'Ism familiya',
-    phone: 'Telefon',
-    telegram: 'Telegram username',
-    role: 'Rol',
-    language: 'Til',
-    performance: 'Performance',
-    balanced: 'Standart',
-    compact: 'Tezkor',
-    employee: 'Xodim',
-    manager: 'Manager',
-    todo: 'Boshlanmagan',
-    in_progress: 'Jarayonda',
-    low: 'Past',
-    medium: 'O‘rta',
-    high: 'Yuqori',
-    noTasks: 'Vazifa topilmadi',
-    noEmployees: 'Xodim topilmadi',
-    calendarEmpty: 'Bu kunda vazifa yo‘q',
-    dashboardDescription: 'Xodimlarga biriktirilgan vazifalar holati.',
-    tasksDescriptionManager: 'Vazifalarni qidirish, filtrlash va boshqarish.',
-    tasksDescriptionEmployee: 'Sizga biriktirilgan vazifalar.',
-    employeesDescription: 'Login, rol, telefon va Telegram ma’lumotlari.',
-    calendarDescription: 'Kunlar bo‘yicha biriktirilgan vazifalar.',
-    settingsDescription: 'Profil, xavfsizlik va interfeys sozlamalari.',
-    profile: 'Profil',
-    appearance: 'Ko‘rinish',
-    security: 'Xavfsizlik',
-    account: 'Akkaunt',
-    theme: 'Mavzu',
-    light: 'Light',
-    dark: 'Dark',
-    openProfileMenu: 'Profil menyusi',
-    menu: 'Menu',
-    checklistHelp: 'Har bir bandni yangi qatordan yozing. Masalan: briefni tekshirish, hisobotni yuborish.',
-    checklistPlaceholder: 'Briefni tekshirish\nHisobotni yuborish\nNatijani tasdiqlash',
-    all: 'Hammasi',
-    loading: 'Yuklanmoqda...',
-    notFoundTitle: 'Sahifa topilmadi',
-    notFoundText: 'Bu manzil mavjud emas yoki foydalanuvchi sahifasi sifatida ochilmaydi.',
-    home: 'Bosh sahifa',
-    supabaseMissingTitle: 'Supabase sozlanmagan',
-    supabaseMissingText: '.env faylga VITE_SUPABASE_URL va VITE_SUPABASE_ANON_KEY qiymatlarini kiriting.',
-    loginRequired: 'Login va parolni kiriting.',
-    taskTitleRequired: 'Vazifa nomini kiriting.',
-    assigneeRequired: 'Xodimni tanlang.',
-    taskSaved: 'Vazifa saqlandi.',
-    taskUpdated: 'Vazifa yangilandi.',
-    taskCreateError: 'Vazifa yaratishda xatolik.',
-    employeeValidation: 'Ism, login va kamida 6 belgili parol kiriting.',
-    employeeCreated: 'Xodim yaratildi.',
-    employeeCreateError: 'Xodim yaratishda xatolik.',
-    statusError: 'Status o‘zgarmadi.',
-    taskDeleted: 'Vazifa o‘chirildi.',
-    taskCanceled: 'Vazifa bekor qilindi.',
-    taskDeleteError: 'Vazifa o‘chirishda xatolik.',
-    checklistError: 'Checklist yangilanmadi.',
-    passwordValidation: 'Yangi parol kamida 6 belgidan iborat bo‘lishi kerak.',
-    profileSaved: 'Profil saqlandi.',
-    profileSaveError: 'Profil saqlanmadi.',
-    profileImage: 'Profil rasmi',
-    changeImage: 'Rasm yuklash',
-    removeImage: 'Rasmni olib tashlash',
-    loginUpdated: 'Login yangilandi.',
-    cannotCancel: 'Vazifani bekor qilib bo‘lmadi.',
-    dataLoadError: 'Data loading failed',
-    loginFailed: 'Login failed',
-    close: 'Yopish',
-    closeMenu: 'Menyuni yopish',
-    delete: 'O‘chirish',
-    previousMonth: 'Oldingi oy',
-    nextMonth: 'Keyingi oy',
-    taskTitlePlaceholder: 'Vazifa nomi',
-    fullNamePlaceholder: 'Falonchiyev Pistonchi',
-    passwordMinPlaceholder: 'Kamida 6 belgi',
-    newPasswordPlaceholder: 'Yangi parol',
-    showPassword: 'Parolni ko‘rsatish',
-    hidePassword: 'Parolni yashirish',
-    weekdays: 'Du,Se,Ch,Pa,Ju,Sh,Ya'
-  },
-  ru: {
-    appName: 'Task Manager',
-    loginTitle: 'Вход',
-    loginHelp: 'Войдите с логином и паролем от руководителя.',
-    email: 'Логин',
-    password: 'Пароль',
-    signIn: 'Войти',
-    dashboard: 'Обзор',
-    tasks: 'Задачи',
-    employees: 'Сотрудники',
-    calendar: 'Календарь',
-    settings: 'Настройки',
-    newTask: 'Новая задача',
-    saveTask: 'Сохранить задачу',
-    editTask: 'Редактировать задачу',
-    cancelTask: 'Отменить',
-    actions: 'Действия',
-    createEmployee: 'Создать сотрудника',
-    saveProfile: 'Сохранить профиль',
-    search: 'Поиск',
-    refresh: 'Обновить',
-    logout: 'Выйти',
-    today: 'Сегодня',
-    active: 'Активные',
-    completed: 'Готово',
-    canceled: 'Отменено',
-    overdue: 'Просрочено',
-    assignee: 'Исполнитель',
-    dueDate: 'Срок',
-    priority: 'Приоритет',
-    status: 'Статус',
-    title: 'Название задачи',
-    description: 'Описание',
-    cancelReason: 'Причина отмены',
-    cancelReasonHelp: 'Напишите, почему задача отменяется.',
-    cancelReasonPlaceholder: 'Например: клиент не ответил или задача потеряла актуальность',
-    cancelReasonRequired: 'Введите причину отмены.',
-    cancelReasonEmpty: 'Причина отмены не указана.',
-    confirmCancel: 'Подтвердить отмену',
-    checklist: 'Checklist',
-    fullName: 'ФИО',
-    phone: 'Телефон',
-    telegram: 'Telegram username',
-    role: 'Роль',
-    language: 'Язык',
-    performance: 'Performance',
-    balanced: 'Стандарт',
-    compact: 'Быстрый',
-    employee: 'Сотрудник',
-    manager: 'Менеджер',
-    todo: 'К выполнению',
-    in_progress: 'В работе',
-    low: 'Низкий',
-    medium: 'Средний',
-    high: 'Высокий',
-    noTasks: 'Задачи не найдены',
-    noEmployees: 'Сотрудники не найдены',
-    calendarEmpty: 'На этот день задач нет',
-    dashboardDescription: 'Состояние задач, назначенных сотрудникам.',
-    tasksDescriptionManager: 'Поиск, фильтрация и управление задачами.',
-    tasksDescriptionEmployee: 'Задачи, назначенные вам.',
-    employeesDescription: 'Логин, роль, телефон и Telegram.',
-    calendarDescription: 'Задачи по датам.',
-    settingsDescription: 'Профиль, безопасность и интерфейс.',
-    profile: 'Профиль',
-    appearance: 'Внешний вид',
-    security: 'Безопасность',
-    account: 'Аккаунт',
-    theme: 'Тема',
-    light: 'Светлая',
-    dark: 'Темная',
-    openProfileMenu: 'Меню профиля',
-    menu: 'Меню',
-    checklistHelp: 'Пишите каждый пункт с новой строки. Например: проверить бриф, отправить отчет.',
-    checklistPlaceholder: 'Проверить бриф\nОтправить отчет\nПодтвердить результат',
-    all: 'Все',
-    loading: 'Загрузка...',
-    notFoundTitle: 'Страница не найдена',
-    notFoundText: 'Этот адрес не существует или не является страницей приложения.',
-    home: 'На главную',
-    supabaseMissingTitle: 'Supabase не настроен',
-    supabaseMissingText: 'Добавьте VITE_SUPABASE_URL и VITE_SUPABASE_ANON_KEY в .env файл.',
-    loginRequired: 'Введите логин и пароль.',
-    taskTitleRequired: 'Введите название задачи.',
-    assigneeRequired: 'Выберите сотрудника.',
-    taskSaved: 'Задача сохранена.',
-    taskUpdated: 'Задача обновлена.',
-    taskCreateError: 'Ошибка при создании задачи.',
-    employeeValidation: 'Введите имя, логин и пароль минимум из 6 символов.',
-    employeeCreated: 'Сотрудник создан.',
-    employeeCreateError: 'Ошибка при создании сотрудника.',
-    statusError: 'Статус не изменен.',
-    taskDeleted: 'Задача удалена.',
-    taskCanceled: 'Задача отменена.',
-    taskDeleteError: 'Ошибка при удалении задачи.',
-    checklistError: 'Checklist не обновлен.',
-    passwordValidation: 'Новый пароль должен быть минимум 6 символов.',
-    profileSaved: 'Профиль сохранен.',
-    profileSaveError: 'Профиль не сохранен.',
-    profileImage: 'Фото профиля',
-    changeImage: 'Загрузить фото',
-    removeImage: 'Удалить фото',
-    loginUpdated: 'Логин обновлен.',
-    cannotCancel: 'Не удалось отменить задачу.',
-    dataLoadError: 'Ошибка загрузки данных',
-    loginFailed: 'Ошибка входа',
-    close: 'Закрыть',
-    closeMenu: 'Закрыть меню',
-    delete: 'Удалить',
-    previousMonth: 'Предыдущий месяц',
-    nextMonth: 'Следующий месяц',
-    taskTitlePlaceholder: 'Имя задачи',
-    fullNamePlaceholder: 'Фалончиев Пистончи',
-    passwordMinPlaceholder: 'Минимум 6 символов',
-    newPasswordPlaceholder: 'Новый пароль',
-    showPassword: 'Показать пароль',
-    hidePassword: 'Скрыть пароль',
-    weekdays: 'Пн,Вт,Ср,Чт,Пт,Сб,Вс'
-  },
-  uz_cyrl: {
-    appName: 'Task Manager',
-    loginTitle: 'Тизимга кириш',
-    loginHelp: 'Раҳбар берган логин ва пароль билан киринг.',
-    email: 'Логин',
-    password: 'Пароль',
-    signIn: 'Кириш',
-    dashboard: 'Dashboard',
-    tasks: 'Вазифалар',
-    employees: 'Ходимлар',
-    calendar: 'Календар',
-    settings: 'Созламалар',
-    newTask: 'Янги вазифа',
-    saveTask: 'Вазифани сақлаш',
-    editTask: 'Вазифани таҳрирлаш',
-    cancelTask: 'Бекор қилиш',
-    actions: 'Амаллар',
-    createEmployee: 'Ходим яратиш',
-    saveProfile: 'Профилни сақлаш',
-    search: 'Қидириш',
-    refresh: 'Янгилаш',
-    logout: 'Чиқиш',
-    today: 'Бугун',
-    active: 'Фаол',
-    completed: 'Бажарилган',
-    canceled: 'Бекор қилинган',
-    overdue: 'Кечиккан',
-    assignee: 'Бириктирилган',
-    dueDate: 'Муддат',
-    priority: 'Устуворлик',
-    status: 'Статус',
-    title: 'Вазифа номи',
-    description: 'Изоҳ',
-    cancelReason: 'Бекор қилиш изоҳи',
-    cancelReasonHelp: 'Вазифа нима сабабдан бекор қилинаётганини ёзинг.',
-    cancelReasonPlaceholder: 'Масалан: мижоз жавоб бермади ёки вазифа долзарблигини йўқотди',
-    cancelReasonRequired: 'Бекор қилиш изоҳини киритинг.',
-    cancelReasonEmpty: 'Бекор қилиш изоҳи киритилмаган.',
-    confirmCancel: 'Бекор қилишни тасдиқлаш',
-    checklist: 'Checklist',
-    fullName: 'Исм фамилия',
-    phone: 'Телефон',
-    telegram: 'Telegram username',
-    role: 'Рол',
-    language: 'Тил',
-    performance: 'Performance',
-    balanced: 'Стандарт',
-    compact: 'Тезкор',
-    employee: 'Ходим',
-    manager: 'Manager',
-    todo: 'Бошланмаган',
-    in_progress: 'Жараёнда',
-    low: 'Паст',
-    medium: 'Ўрта',
-    high: 'Юқори',
-    noTasks: 'Вазифа топилмади',
-    noEmployees: 'Ходим топилмади',
-    calendarEmpty: 'Бу кунда вазифа йўқ',
-    dashboardDescription: 'Ходимларга бириктирилган вазифалар ҳолати.',
-    tasksDescriptionManager: 'Вазифаларни қидириш, фильтрлаш ва бошқариш.',
-    tasksDescriptionEmployee: 'Сизга бириктирилган вазифалар.',
-    employeesDescription: 'Логин, рол, телефон ва Telegram маълумотлари.',
-    calendarDescription: 'Кунлар бўйича бириктирилган вазифалар.',
-    settingsDescription: 'Профил, хавфсизлик ва интерфейс созламалари.',
-    profile: 'Профил',
-    appearance: 'Кўриниш',
-    security: 'Хавфсизлик',
-    account: 'Аккаунт',
-    theme: 'Тема',
-    light: 'Light',
-    dark: 'Dark',
-    openProfileMenu: 'Профил менюси',
-    menu: 'Меню',
-    checklistHelp: 'Ҳар бир бандни янги қатордан ёзинг. Масалан: briefни текшириш, ҳисоботни юбориш.',
-    checklistPlaceholder: 'Briefни текшириш\nҲисоботни юбориш\nНатижани тасдиқлаш',
-    all: 'Ҳаммаси',
-    loading: 'Юкланмоқда...',
-    notFoundTitle: 'Саҳифа топилмади',
-    notFoundText: 'Бу манзил мавжуд эмас ёки фойдаланувчи саҳифаси сифатида очилмайди.',
-    home: 'Бош саҳифа',
-    supabaseMissingTitle: 'Supabase созланмаган',
-    supabaseMissingText: '.env файлга VITE_SUPABASE_URL ва VITE_SUPABASE_ANON_KEY қийматларини киритинг.',
-    loginRequired: 'Логин ва паролни киритинг.',
-    taskTitleRequired: 'Вазифа номини киритинг.',
-    assigneeRequired: 'Ходимни танланг.',
-    taskSaved: 'Вазифа сақланди.',
-    taskUpdated: 'Вазифа янгиланди.',
-    taskCreateError: 'Вазифа яратишда хатолик.',
-    employeeValidation: 'Исм, логин ва камида 6 белгили парол киритинг.',
-    employeeCreated: 'Ходим яратилди.',
-    employeeCreateError: 'Ходим яратишда хатолик.',
-    statusError: 'Статус ўзгармади.',
-    taskDeleted: 'Вазифа ўчирилди.',
-    taskCanceled: 'Вазифа бекор қилинди.',
-    taskDeleteError: 'Вазифа ўчиришда хатолик.',
-    checklistError: 'Checklist янгиланмади.',
-    passwordValidation: 'Янги парол камида 6 белгидан иборат бўлиши керак.',
-    profileSaved: 'Профил сақланди.',
-    profileSaveError: 'Профил сақланмади.',
-    profileImage: 'Профил расми',
-    changeImage: 'Расм юклаш',
-    removeImage: 'Расмни олиб ташлаш',
-    loginUpdated: 'Логин янгиланди.',
-    cannotCancel: 'Вазифани бекор қилиб бўлмади.',
-    dataLoadError: 'Data loading failed',
-    loginFailed: 'Login failed',
-    close: 'Ёпиш',
-    closeMenu: 'Менюни ёпиш',
-    delete: 'Ўчириш',
-    previousMonth: 'Олдинги ой',
-    nextMonth: 'Кейинги ой',
-    taskTitlePlaceholder: 'Вазифа номи',
-    fullNamePlaceholder: 'Фалончиев Пистончи',
-    passwordMinPlaceholder: 'Камида 6 белги',
-    newPasswordPlaceholder: 'Янги парол',
-    showPassword: 'Паролни кўрсатиш',
-    hidePassword: 'Паролни яшириш',
-    weekdays: 'Ду,Се,Чо,Па,Жу,Ша,Як'
-  }
-}
-
-const activeView = ref<ViewKey>(savedView && viewKeys.includes(savedView) ? savedView : 'dashboard')
+const activeView = ref<ViewKey>(savedView && VIEW_KEYS.includes(savedView) ? savedView : 'dashboard')
 const loading = ref(true)
 const backgroundRefreshing = ref(false)
 const saving = ref(false)
@@ -416,8 +65,7 @@ const settingsPasswordVisible = ref(false)
 const currentPath = ref(window.location.pathname)
 const profileMenuOpen = ref(false)
 const themeMode = ref<ThemeMode>(savedTheme === 'dark' ? 'dark' : 'light')
-const toasts = ref<ToastItem[]>([])
-let toastId = 0
+const { toasts, showToast, dismissToast } = useToasts()
 let refreshPromise: Promise<void> | null = null
 
 const profile = ref<Profile | null>(null)
@@ -550,11 +198,7 @@ const calendarTitle = computed(() => {
   return `${String(calendarCursor.value.getMonth() + 1).padStart(2, '0')}.${calendarCursor.value.getFullYear()}`
 })
 
-const localeName = computed(() => {
-  if (currentLanguage.value === 'ru') return 'ru-RU'
-  if (currentLanguage.value === 'uz_cyrl') return 'uz-Cyrl-UZ'
-  return 'uz-UZ'
-})
+const localeName = computed(() => getLocaleName(currentLanguage.value))
 
 const calendarDays = computed(() => {
   const start = new Date(calendarCursor.value.getFullYear(), calendarCursor.value.getMonth(), 1)
@@ -584,39 +228,12 @@ const selectedCalendarTasks = computed(() => tasks.value.filter((task) => task.d
 const weekdayLabels = computed(() => t('weekdays').split(','))
 
 function t(key: string) {
-  return copy[currentLanguage.value]?.[key] || copy.uz[key] || key
-}
-
-function toIsoDate(date: Date) {
-  const year = date.getFullYear()
-  const month = String(date.getMonth() + 1).padStart(2, '0')
-  const day = String(date.getDate()).padStart(2, '0')
-  return `${year}-${month}-${day}`
+  return translate(currentLanguage.value, key)
 }
 
 function resetMessages() {
   errorMessage.value = ''
   noticeMessage.value = ''
-}
-
-function showToast(type: ToastType, message: string) {
-  if (!message) return
-  const id = ++toastId
-  toasts.value.push({ id, type, message })
-  window.setTimeout(() => dismissToast(id), 4200)
-}
-
-function dismissToast(id: number) {
-  toasts.value = toasts.value.filter((toast) => toast.id !== id)
-}
-
-function startToastSwipe(toast: ToastItem, event: PointerEvent) {
-  toast.startX = event.clientX
-}
-
-function endToastSwipe(toast: ToastItem, event: PointerEvent) {
-  if (toast.startX !== undefined && Math.abs(event.clientX - toast.startX) > 40) dismissToast(toast.id)
-  toast.startX = undefined
 }
 
 function setTheme(mode: ThemeMode) {
@@ -654,25 +271,12 @@ function roleLabel(role?: UserRole | null) {
   return t(role || 'employee')
 }
 
-function formatDate(date: string | null) {
-  if (!date) return '—'
-  const [year, month, day] = date.split('-')
-  if (!year || !month || !day) return date
-  return `${day}.${month}.${year}`
-}
-
 function formatDay(date: Date) {
-  return new Intl.DateTimeFormat(localeName.value, { day: '2-digit' }).format(date)
+  return formatDayNumber(date, localeName.value)
 }
 
 function getInitials(name?: string | null) {
-  const clean = name || profile.value?.full_name || authForm.email || 'U'
-  return clean
-    .split(/[\s@.]+/)
-    .filter(Boolean)
-    .slice(0, 2)
-    .map((part) => part[0]?.toUpperCase())
-    .join('')
+  return getInitialsFromName(name, profile.value?.full_name || authForm.email || 'U')
 }
 
 function uniqueProfiles(dayTasks: Task[]) {
@@ -684,10 +288,6 @@ function uniqueProfiles(dayTasks: Task[]) {
     if (assignee?.id) map.set(assignee.id, assignee)
   })
   return [...map.values()].slice(0, 4)
-}
-
-function displayTelegram(username?: string | null) {
-  return username ? `@${username.replace(/^@+/, '')}` : '—'
 }
 
 function selectView(key: ViewKey) {
@@ -1030,11 +630,11 @@ function handleAvatarFile(event: Event) {
 onMounted(initializeAuth)
 
 watch(activeView, (view) => {
-  localStorage.setItem('task-manager-active-view', view)
+  localStorage.setItem(STORAGE_KEYS.activeView, view)
 })
 
 watch(themeMode, (mode) => {
-  localStorage.setItem('task-manager-theme', mode)
+  localStorage.setItem(STORAGE_KEYS.theme, mode)
 })
 
 watch(noticeMessage, (message) => {
@@ -1049,43 +649,15 @@ watch(errorMessage, (message) => {
 <template>
   <main
     :class="['app-shell', `theme-${themeMode}`, settingsForm.performance_mode === 'compact' && 'performance-compact']">
-    <div class="toast-stack" aria-live="polite">
-      <TransitionGroup name="toast">
-        <button v-for="toast in toasts" :key="toast.id" :class="['toast-card', toast.type]"
-          @click="dismissToast(toast.id)" @pointerdown="startToastSwipe(toast, $event)"
-          @pointerup="endToastSwipe(toast, $event)">
-          <i
-            :class="['bi', toast.type === 'success' ? 'bi-check-circle' : toast.type === 'error' ? 'bi-exclamation-circle' : 'bi-info-circle']"></i>
-          <span>{{ toast.message }}</span>
-          <i class="bi bi-x-lg toast-close"></i>
-        </button>
-      </TransitionGroup>
-    </div>
-
-    <Transition name="panel-pop">
-      <div v-if="cancelDialogTask" class="modal-scrim" @click.self="closeCancelDialog">
-        <form class="modal-panel cancel-modal" @submit.prevent="confirmCancelTask">
-          <div class="section-header clean">
-            <div>
-              <h2>{{ t('cancelReason') }}</h2>
-              <p>{{ t('cancelReasonHelp') }}</p>
-            </div>
-            <button type="button" class="ghost-button icon-only" @click="closeCancelDialog" :aria-label="t('close')">
-              <i class="bi bi-x-lg"></i>
-            </button>
-          </div>
-          <strong class="modal-task-title">{{ cancelDialogTask.title }}</strong>
-          <textarea v-model="cancelReason" rows="4" :placeholder="t('cancelReasonPlaceholder')" autofocus></textarea>
-          <div class="modal-actions">
-            <button type="button" class="ghost-button" @click="closeCancelDialog">{{ t('close') }}</button>
-            <button class="primary-button danger-button" :disabled="saving">
-              <i class="bi bi-x-circle"></i>
-              {{ saving ? '...' : t('confirmCancel') }}
-            </button>
-          </div>
-        </form>
-      </div>
-    </Transition>
+    <ToastStack :toasts="toasts" @dismiss="dismissToast" />
+    <CancelTaskModal
+      v-model:reason="cancelReason"
+      :task="cancelDialogTask"
+      :saving="saving"
+      :t="t"
+      @close="closeCancelDialog"
+      @confirm="confirmCancelTask"
+    />
 
     <section v-if="isNotFoundRoute" class="not-found-screen">
       <div class="not-found-panel">
@@ -1263,10 +835,12 @@ watch(errorMessage, (message) => {
                     <span>{{ task.assignee?.full_name || employeeMap.get(task.assignee_id || '')?.full_name || '—'
                       }}</span>
                   </div>
-                  <button type="button" :class="['status-pill', taskDisplayStatus(task)]"
-                    @click="showCancelReason(task, $event)">
-                    {{ statusLabel(taskDisplayStatus(task)) }}
-                  </button>
+                  <StatusBadge
+                    :status="taskDisplayStatus(task)"
+                    :label="statusLabel(taskDisplayStatus(task))"
+                    :clickable="taskDisplayStatus(task) === 'canceled'"
+                    @activate="showCancelReason(task, $event)"
+                  />
                   <span>{{ formatDate(task.due_date) }}</span>
                 </article>
               </div>
@@ -1371,10 +945,12 @@ watch(errorMessage, (message) => {
                       <span>{{ task.assignee?.full_name || employeeMap.get(task.assignee_id || '')?.full_name || '—'
                         }}</span>
                     </div>
-                    <button type="button" :class="['status-pill', taskDisplayStatus(task)]"
-                      @click="showCancelReason(task, $event)">
-                      {{ statusLabel(taskDisplayStatus(task)) }}
-                    </button>
+                    <StatusBadge
+                      :status="taskDisplayStatus(task)"
+                      :label="statusLabel(taskDisplayStatus(task))"
+                      :clickable="taskDisplayStatus(task) === 'canceled'"
+                      @activate="showCancelReason(task, $event)"
+                    />
                     <span class="muted-text">{{ formatDate(task.due_date) }}</span>
                     <button class="ghost-button icon-only"
                       @click.stop="taskActionMenuId = taskActionMenuId === task.id ? null : task.id"
@@ -1395,10 +971,12 @@ watch(errorMessage, (message) => {
                 <template v-if="selectedTask">
                   <div class="section-header clean">
                     <h2>{{ selectedTask.title }}</h2>
-                    <button type="button" :class="['status-pill', taskDisplayStatus(selectedTask)]"
-                      @click="showCancelReason(selectedTask, $event)">
-                      {{ statusLabel(taskDisplayStatus(selectedTask)) }}
-                    </button>
+                    <StatusBadge
+                      :status="taskDisplayStatus(selectedTask)"
+                      :label="statusLabel(taskDisplayStatus(selectedTask))"
+                      :clickable="taskDisplayStatus(selectedTask) === 'canceled'"
+                      @activate="showCancelReason(selectedTask, $event)"
+                    />
                   </div>
 
                   <dl class="detail-list">
@@ -1581,10 +1159,12 @@ watch(errorMessage, (message) => {
                     <span>{{ task.assignee?.full_name || employeeMap.get(task.assignee_id || '')?.full_name || '—'
                       }}</span>
                   </div>
-                  <button type="button" :class="['status-pill', taskDisplayStatus(task)]"
-                    @click="showCancelReason(task, $event)">
-                    {{ statusLabel(taskDisplayStatus(task)) }}
-                  </button>
+                  <StatusBadge
+                    :status="taskDisplayStatus(task)"
+                    :label="statusLabel(taskDisplayStatus(task))"
+                    :clickable="taskDisplayStatus(task) === 'canceled'"
+                    @activate="showCancelReason(task, $event)"
+                  />
                 </article>
               </div>
             </aside>
