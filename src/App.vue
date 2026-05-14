@@ -1357,7 +1357,7 @@ watch(errorMessage, (message) => {
                   </div>
 
                   <div v-if="selectedTask.checklist?.length" class="checklist-list">
-                    <label v-for="item in selectedTask.checklist" :key="item.id">
+                    <label v-for="item in selectedTask.checklist" :key="item.id" class="checklist-item">
                       <input :checked="item.is_done" type="checkbox" @change="toggleChecklist(item.id, !item.is_done)" />
                       <span :class="{ done: item.is_done }">{{ item.title }}</span>
                     </label>
