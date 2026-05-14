@@ -1,0 +1,25 @@
+{
+  "$schema": "https://openapi.vercel.sh/vercel.json",
+  "framework": "vite",
+  "buildCommand": "npm run build",
+  "outputDirectory": "dist",
+  "installCommand": "npm install",
+  "rewrites": [
+    {
+      "source": "/api/employee",
+      "destination": "/api/employees"
+    },
+    {
+      "source": "/api/notify-task",
+      "destination": "/api/notify-task"
+    },
+    {
+      "source": "/api/telegram-webhook",
+      "destination": "/api/telegram-webhook"
+    },
+    {
+      "source": "/(.*)",
+      "destination": "/index.html"
+    }
+  ]
+}
