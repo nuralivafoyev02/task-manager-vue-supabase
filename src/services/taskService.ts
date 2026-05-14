@@ -26,6 +26,16 @@ export function normalizeTelegramUsername(value: string) {
   return value.trim().replace(/^@+/, '').toLowerCase()
 }
 
+export function normalizeLoginIdentifier(value: string) {
+  return value.trim().toLowerCase()
+}
+
+export function loginToAuthEmail(value: string) {
+  const login = normalizeLoginIdentifier(value)
+  if (login.includes('@')) return login
+  return `${login.replace(/[^a-z0-9._-]+/g, '-') || 'user'}@task-manager.local`
+}
+
 async function getAccessToken() {
   const { data, error } = await supabase.auth.getSession()
   if (error) throw error
@@ -48,7 +58,7 @@ export async function getCurrentUser() {
 }
 
 export async function signInWithPassword(email: string, password: string) {
-  const { error } = await supabase.auth.signInWithPassword({ email, password })
+  const { error } = await supabase.auth.signInWithPassword({ email: loginToAuthEmail(email), password })
   if (error) throw error
 }
 

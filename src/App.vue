@@ -9,6 +9,7 @@ import {
   loadProfile,
   loadProfiles,
   loadTasks,
+  normalizeLoginIdentifier,
   normalizeTelegramUsername,
   signInWithPassword,
   signOut,
@@ -38,7 +39,7 @@ const copy: Record<AppLanguage, Record<string, string>> = {
     appName: 'Task Manager',
     loginTitle: 'Tizimga kirish',
     loginHelp: 'Rahbar bergan login va parol bilan kiring.',
-    email: 'Login email',
+    email: 'Login',
     password: 'Parol',
     signIn: 'Kirish',
     dashboard: 'Dashboard',
@@ -87,7 +88,7 @@ const copy: Record<AppLanguage, Record<string, string>> = {
     appName: 'Task Manager',
     loginTitle: 'Вход',
     loginHelp: 'Войдите с логином и паролем от руководителя.',
-    email: 'Email для входа',
+    email: 'Логин',
     password: 'Пароль',
     signIn: 'Войти',
     dashboard: 'Обзор',
@@ -136,7 +137,7 @@ const copy: Record<AppLanguage, Record<string, string>> = {
     appName: 'Task Manager',
     loginTitle: 'Тизимга кириш',
     loginHelp: 'Раҳбар берган логин ва пароль билан киринг.',
-    email: 'Логин email',
+    email: 'Логин',
     password: 'Пароль',
     signIn: 'Кириш',
     dashboard: 'Dashboard',
@@ -192,6 +193,9 @@ const noticeMessage = ref('')
 const mobileMenuOpen = ref(false)
 const sessionReady = ref(false)
 const isAuthenticated = ref(false)
+const employeePasswordVisible = ref(false)
+const settingsPasswordVisible = ref(false)
+const currentPath = ref(window.location.pathname)
 let refreshPromise: Promise<void> | null = null
 
 const profile = ref<Profile | null>(null)
@@ -240,6 +244,7 @@ const settingsForm = reactive({
 })
 
 const isManager = computed(() => profile.value?.role === 'manager')
+const isNotFoundRoute = computed(() => !['/', '/index.html'].includes(currentPath.value))
 const currentLanguage = computed<AppLanguage>(() => settingsForm.language || profile.value?.language || 'uz')
 const todayIso = computed(() => toIsoDate(new Date()))
 const activeTasks = computed(() => tasks.value.filter((task) => task.status !== 'completed'))
@@ -249,17 +254,17 @@ const overdueTasks = computed(() => tasks.value.filter((task) => isOverdue(task)
 const navItems = computed<Array<{ key: ViewKey; label: string; icon: string }>>(() => {
   const base: Array<{ key: ViewKey; label: string; icon: string }> = isManager.value
     ? [
-        { key: 'dashboard', label: t('dashboard'), icon: '⌂' },
-        { key: 'tasks', label: t('tasks'), icon: '☑' },
-        { key: 'employees', label: t('employees'), icon: '◎' },
-        { key: 'calendar', label: t('calendar'), icon: '◷' }
+        { key: 'dashboard', label: t('dashboard'), icon: 'bi-speedometer2' },
+        { key: 'tasks', label: t('tasks'), icon: 'bi-check2-square' },
+        { key: 'employees', label: t('employees'), icon: 'bi-people' },
+        { key: 'calendar', label: t('calendar'), icon: 'bi-calendar3' }
       ]
     : [
-        { key: 'tasks', label: t('tasks'), icon: '☑' },
-        { key: 'calendar', label: t('calendar'), icon: '◷' }
+        { key: 'tasks', label: t('tasks'), icon: 'bi-check2-square' },
+        { key: 'calendar', label: t('calendar'), icon: 'bi-calendar3' }
       ]
 
-  return [...base, { key: 'settings', label: t('settings'), icon: '⚙' }]
+  return [...base, { key: 'settings', label: t('settings'), icon: 'bi-gear' }]
 })
 
 const assigneeOptions = computed(() => {
@@ -363,6 +368,11 @@ function resetMessages() {
   noticeMessage.value = ''
 }
 
+function goHome() {
+  window.history.replaceState({}, '', '/')
+  currentPath.value = '/'
+}
+
 function isOverdue(task: Task) {
   return Boolean(task.due_date && task.due_date < todayIso.value && task.status !== 'completed')
 }
@@ -462,6 +472,7 @@ function resetEmployeeForm() {
     telegram_username: '',
     role: 'employee'
   })
+  employeePasswordVisible.value = false
 }
 
 async function refreshData(options: { showLoader?: boolean; clearMessages?: boolean } = {}) {
@@ -524,7 +535,7 @@ async function initializeAuth() {
 
 async function handleLogin() {
   resetMessages()
-  if (!authForm.email.includes('@') || authForm.password.length < 1) {
+  if (normalizeLoginIdentifier(authForm.email).length < 1 || authForm.password.length < 1) {
     errorMessage.value = 'Login va parolni kiriting.'
     return
   }
@@ -585,8 +596,8 @@ async function submitEmployee() {
   resetMessages()
   if (!isManager.value) return
 
-  if (!employeeForm.full_name.trim() || !employeeForm.login_email.includes('@') || employeeForm.password.length < 8) {
-    errorMessage.value = 'Ism, login email va kamida 8 belgili parol kiriting.'
+  if (!employeeForm.full_name.trim() || normalizeLoginIdentifier(employeeForm.login_email).length < 3 || employeeForm.password.length < 6) {
+    errorMessage.value = 'Ism, login va kamida 6 belgili parol kiriting.'
     return
   }
 
@@ -595,7 +606,7 @@ async function submitEmployee() {
     await createEmployee({
       ...employeeForm,
       full_name: employeeForm.full_name.trim(),
-      login_email: employeeForm.login_email.trim().toLowerCase(),
+      login_email: normalizeLoginIdentifier(employeeForm.login_email),
       telegram_username: normalizeTelegramUsername(employeeForm.telegram_username || '')
     })
     noticeMessage.value = 'Xodim yaratildi.'
@@ -651,6 +662,11 @@ async function toggleChecklist(itemId: string, checked: boolean) {
 
 async function saveSettings() {
   resetMessages()
+  if (settingsForm.password.trim() && settingsForm.password.trim().length < 6) {
+    errorMessage.value = 'Yangi parol kamida 6 belgidan iborat bo‘lishi kerak.'
+    return
+  }
+
   saving.value = true
 
   try {
@@ -679,9 +695,21 @@ onMounted(initializeAuth)
 
 <template>
   <main :class="['app-shell', settingsForm.performance_mode === 'compact' && 'performance-compact']">
-    <section v-if="!isSupabaseConfigured" class="auth-screen">
+    <section v-if="isNotFoundRoute" class="not-found-screen">
+      <div class="not-found-panel">
+        <span>404</span>
+        <h1>Sahifa topilmadi</h1>
+        <p>Bu manzil mavjud emas yoki foydalanuvchi sahifasi sifatida ochilmaydi.</p>
+        <button class="primary-button fit" @click="goHome">
+          <i class="bi bi-house-door"></i>
+          Bosh sahifa
+        </button>
+      </div>
+    </section>
+
+    <section v-else-if="!isSupabaseConfigured" class="auth-screen">
       <div class="auth-panel">
-        <div class="brand-mark">✓</div>
+        <div class="brand-mark"><i class="bi bi-check2"></i></div>
         <h1>Supabase sozlanmagan</h1>
         <p>.env faylga VITE_SUPABASE_URL va VITE_SUPABASE_ANON_KEY qiymatlarini kiriting.</p>
         <code>cp .env.example .env</code>
@@ -691,30 +719,33 @@ onMounted(initializeAuth)
     <section v-else-if="sessionReady && !isAuthenticated" class="auth-screen">
       <form class="auth-panel" @submit.prevent="handleLogin">
         <div class="brand-row center">
-          <div class="brand-mark">✓</div>
+          <div class="brand-mark"><i class="bi bi-check2"></i></div>
           <strong>{{ t('appName') }}</strong>
         </div>
         <h1>{{ t('loginTitle') }}</h1>
         <p>{{ t('loginHelp') }}</p>
 
         <label>{{ t('email') }}</label>
-        <input v-model="authForm.email" type="email" autocomplete="email" placeholder="name@company.uz" />
+        <input v-model="authForm.email" type="text" autocomplete="username" placeholder="ali.valiyev" />
 
         <label>{{ t('password') }}</label>
         <input v-model="authForm.password" type="password" autocomplete="current-password" placeholder="••••••••" />
 
         <button class="primary-button full" :disabled="saving">
+          <i class="bi bi-box-arrow-in-right"></i>
           {{ saving ? '...' : t('signIn') }}
         </button>
 
-        <div v-if="errorMessage" class="message error">{{ errorMessage }}</div>
+        <Transition name="message-slide">
+          <div v-if="errorMessage" class="message error">{{ errorMessage }}</div>
+        </Transition>
       </form>
     </section>
 
     <template v-else>
       <aside :class="['sidebar', { 'is-open': mobileMenuOpen }]">
         <div class="brand-row">
-          <div class="brand-mark">✓</div>
+          <div class="brand-mark"><i class="bi bi-check2"></i></div>
           <strong>{{ t('appName') }}</strong>
         </div>
 
@@ -725,7 +756,7 @@ onMounted(initializeAuth)
             :class="['nav-item', { active: activeView === item.key }]"
             @click="selectView(item.key)"
           >
-            <span>{{ item.icon }}</span>
+            <i :class="['bi', item.icon]"></i>
             {{ item.label }}
           </button>
         </nav>
@@ -741,14 +772,17 @@ onMounted(initializeAuth)
 
       <section class="workspace">
         <header class="topbar">
-          <button class="menu-button" @click="mobileMenuOpen = !mobileMenuOpen">☰</button>
+          <button class="menu-button" @click="mobileMenuOpen = !mobileMenuOpen" aria-label="Menu">
+            <i class="bi bi-list"></i>
+          </button>
           <div>
             <h1>{{ pageTitle }}</h1>
             <p>{{ pageDescription }}</p>
           </div>
           <div class="topbar-actions">
             <button v-if="isManager" class="primary-button" @click="activeView = 'tasks'; showTaskComposer = true; resetTaskForm()">
-              + {{ t('newTask') }}
+              <i class="bi bi-plus-lg"></i>
+              {{ t('newTask') }}
             </button>
             <button
               class="ghost-button icon-only"
@@ -756,18 +790,22 @@ onMounted(initializeAuth)
               @click="refreshData({ clearMessages: true })"
               :title="t('refresh')"
             >
-              ↻
+              <i :class="['bi', backgroundRefreshing ? 'bi-arrow-repeat spin' : 'bi-arrow-clockwise']"></i>
             </button>
           </div>
         </header>
 
-        <div v-if="noticeMessage" class="message success">{{ noticeMessage }}</div>
-        <div v-if="errorMessage" class="message error">{{ errorMessage }}</div>
+        <Transition name="message-slide">
+          <div v-if="noticeMessage" class="message success">{{ noticeMessage }}</div>
+        </Transition>
+        <Transition name="message-slide">
+          <div v-if="errorMessage" class="message error">{{ errorMessage }}</div>
+        </Transition>
 
         <section v-if="loading" class="empty-state">Loading...</section>
 
-        <template v-else>
-          <section v-if="activeView === 'dashboard' && isManager" class="view-stack">
+        <Transition v-else name="view-slide" mode="out-in">
+          <section v-if="activeView === 'dashboard' && isManager" key="dashboard" class="view-stack">
             <div class="metric-row">
               <div>
                 <span>{{ t('active') }}</span>
@@ -790,7 +828,10 @@ onMounted(initializeAuth)
             <section class="panel">
               <div class="section-header">
                 <h2>{{ t('tasks') }}</h2>
-                <button class="link-button" @click="activeView = 'tasks'">{{ t('tasks') }}</button>
+                <button class="link-button" @click="activeView = 'tasks'">
+                  <i class="bi bi-arrow-right"></i>
+                  {{ t('tasks') }}
+                </button>
               </div>
               <div class="task-list">
                 <article
@@ -816,11 +857,14 @@ onMounted(initializeAuth)
             </section>
           </section>
 
-          <section v-else-if="activeView === 'tasks'" class="view-stack">
-            <form v-if="isManager && showTaskComposer" class="panel form-panel" @submit.prevent="submitTask">
+          <section v-else-if="activeView === 'tasks'" key="tasks" class="view-stack">
+            <Transition name="panel-pop">
+              <form v-if="isManager && showTaskComposer" class="panel form-panel" @submit.prevent="submitTask">
               <div class="section-header">
                 <h2>{{ t('newTask') }}</h2>
-                <button type="button" class="ghost-button icon-only" @click="showTaskComposer = false">×</button>
+                <button type="button" class="ghost-button icon-only" @click="showTaskComposer = false" aria-label="Yopish">
+                  <i class="bi bi-x-lg"></i>
+                </button>
               </div>
 
               <div class="form-grid">
@@ -861,12 +905,16 @@ onMounted(initializeAuth)
                 <textarea v-model="taskForm.checklistText" rows="3" placeholder="Har qator bitta item"></textarea>
               </label>
 
-              <button class="primary-button fit" :disabled="saving">{{ saving ? '...' : t('saveTask') }}</button>
-            </form>
+              <button class="primary-button fit" :disabled="saving">
+                <i class="bi bi-save"></i>
+                {{ saving ? '...' : t('saveTask') }}
+              </button>
+              </form>
+            </Transition>
 
             <div class="toolbar">
               <div class="search-box">
-                <span>⌕</span>
+                <i class="bi bi-search"></i>
                 <input v-model="searchQuery" :placeholder="t('search')" />
               </div>
               <select v-model="statusFilter" class="filter-select">
@@ -882,7 +930,10 @@ onMounted(initializeAuth)
               <section class="panel">
                 <div class="section-header">
                   <h2>{{ t('tasks') }}</h2>
-                  <button v-if="isManager" class="link-button" @click="showTaskComposer = true; resetTaskForm()">+ {{ t('newTask') }}</button>
+                  <button v-if="isManager" class="link-button" @click="showTaskComposer = true; resetTaskForm()">
+                    <i class="bi bi-plus-lg"></i>
+                    {{ t('newTask') }}
+                  </button>
                 </div>
 
                 <div v-if="!filteredTasks.length" class="empty-state">{{ t('noTasks') }}</div>
@@ -905,7 +956,9 @@ onMounted(initializeAuth)
                     </div>
                     <span :class="['status-pill', taskDisplayStatus(task)]">{{ statusLabel(taskDisplayStatus(task)) }}</span>
                     <span class="muted-text">{{ formatDate(task.due_date) }}</span>
-                    <button v-if="isManager" class="ghost-button icon-only danger" @click.stop="removeTask(task)">×</button>
+                    <button v-if="isManager" class="ghost-button icon-only danger" @click.stop="removeTask(task)" aria-label="O‘chirish">
+                      <i class="bi bi-trash3"></i>
+                    </button>
                   </article>
                 </div>
               </section>
@@ -953,11 +1006,14 @@ onMounted(initializeAuth)
             </div>
           </section>
 
-          <section v-else-if="activeView === 'employees' && isManager" class="view-stack">
-            <form v-if="showEmployeeComposer" class="panel form-panel" @submit.prevent="submitEmployee">
+          <section v-else-if="activeView === 'employees' && isManager" key="employees" class="view-stack">
+            <Transition name="panel-pop">
+              <form v-if="showEmployeeComposer" class="panel form-panel" @submit.prevent="submitEmployee">
               <div class="section-header">
                 <h2>{{ t('createEmployee') }}</h2>
-                <button type="button" class="ghost-button icon-only" @click="showEmployeeComposer = false">×</button>
+                <button type="button" class="ghost-button icon-only" @click="showEmployeeComposer = false" aria-label="Yopish">
+                  <i class="bi bi-x-lg"></i>
+                </button>
               </div>
 
               <div class="form-grid">
@@ -967,11 +1023,26 @@ onMounted(initializeAuth)
                 </label>
                 <label>
                   {{ t('email') }}
-                  <input v-model="employeeForm.login_email" type="email" placeholder="ali@company.uz" />
+                  <input v-model="employeeForm.login_email" type="text" autocomplete="username" placeholder="ali.valiyev" />
                 </label>
                 <label>
                   {{ t('password') }}
-                  <input v-model="employeeForm.password" type="password" placeholder="Kamida 8 belgi" />
+                  <div class="password-field">
+                    <input
+                      v-model="employeeForm.password"
+                      :type="employeePasswordVisible ? 'text' : 'password'"
+                      autocomplete="new-password"
+                      placeholder="Kamida 6 belgi"
+                    />
+                    <button
+                      type="button"
+                      class="password-toggle"
+                      :aria-label="employeePasswordVisible ? 'Parolni yashirish' : 'Parolni ko‘rsatish'"
+                      @click="employeePasswordVisible = !employeePasswordVisible"
+                    >
+                      <i :class="['bi', employeePasswordVisible ? 'bi-eye-slash' : 'bi-eye']"></i>
+                    </button>
+                  </div>
                 </label>
                 <label>
                   {{ t('role') }}
@@ -990,13 +1061,20 @@ onMounted(initializeAuth)
                 </label>
               </div>
 
-              <button class="primary-button fit" :disabled="saving">{{ saving ? '...' : t('createEmployee') }}</button>
-            </form>
+              <button class="primary-button fit" :disabled="saving">
+                <i class="bi bi-person-plus"></i>
+                {{ saving ? '...' : t('createEmployee') }}
+              </button>
+              </form>
+            </Transition>
 
             <section class="panel">
               <div class="section-header">
                 <h2>{{ t('employees') }}</h2>
-                <button class="primary-button fit" @click="showEmployeeComposer = true; resetEmployeeForm()">+ {{ t('createEmployee') }}</button>
+                <button class="primary-button fit" @click="showEmployeeComposer = true; resetEmployeeForm()">
+                  <i class="bi bi-person-plus"></i>
+                  {{ t('createEmployee') }}
+                </button>
               </div>
 
               <div v-if="!employees.length" class="empty-state">{{ t('noEmployees') }}</div>
@@ -1015,12 +1093,16 @@ onMounted(initializeAuth)
             </section>
           </section>
 
-          <section v-else-if="activeView === 'calendar'" class="calendar-layout">
+          <section v-else-if="activeView === 'calendar'" key="calendar" class="calendar-layout">
             <section class="panel">
               <div class="section-header">
-                <button class="ghost-button icon-only" @click="previousMonth">‹</button>
+                <button class="ghost-button icon-only" @click="previousMonth" aria-label="Oldingi oy">
+                  <i class="bi bi-chevron-left"></i>
+                </button>
                 <h2>{{ calendarTitle }}</h2>
-                <button class="ghost-button icon-only" @click="nextMonth">›</button>
+                <button class="ghost-button icon-only" @click="nextMonth" aria-label="Keyingi oy">
+                  <i class="bi bi-chevron-right"></i>
+                </button>
               </div>
 
               <div class="weekday-row">
@@ -1070,7 +1152,7 @@ onMounted(initializeAuth)
             </aside>
           </section>
 
-          <section v-else-if="activeView === 'settings'" class="settings-layout">
+          <section v-else-if="activeView === 'settings'" key="settings" class="settings-layout">
             <form class="panel form-panel" @submit.prevent="saveSettings">
               <div class="section-header clean">
                 <h2>{{ t('settings') }}</h2>
@@ -1091,7 +1173,22 @@ onMounted(initializeAuth)
                 </label>
                 <label>
                   {{ t('password') }}
-                  <input v-model="settingsForm.password" type="password" placeholder="Yangi parol" />
+                  <div class="password-field">
+                    <input
+                      v-model="settingsForm.password"
+                      :type="settingsPasswordVisible ? 'text' : 'password'"
+                      autocomplete="new-password"
+                      placeholder="Yangi parol"
+                    />
+                    <button
+                      type="button"
+                      class="password-toggle"
+                      :aria-label="settingsPasswordVisible ? 'Parolni yashirish' : 'Parolni ko‘rsatish'"
+                      @click="settingsPasswordVisible = !settingsPasswordVisible"
+                    >
+                      <i :class="['bi', settingsPasswordVisible ? 'bi-eye-slash' : 'bi-eye']"></i>
+                    </button>
+                  </div>
                 </label>
                 <label>
                   {{ t('language') }}
@@ -1111,8 +1208,14 @@ onMounted(initializeAuth)
               </div>
 
               <div class="settings-actions">
-                <button class="primary-button fit" :disabled="saving">{{ saving ? '...' : t('saveProfile') }}</button>
-                <button type="button" class="ghost-button" @click="handleLogout">{{ t('logout') }}</button>
+                <button class="primary-button fit" :disabled="saving">
+                  <i class="bi bi-save"></i>
+                  {{ saving ? '...' : t('saveProfile') }}
+                </button>
+                <button type="button" class="ghost-button" @click="handleLogout">
+                  <i class="bi bi-box-arrow-right"></i>
+                  {{ t('logout') }}
+                </button>
               </div>
             </form>
 
@@ -1132,7 +1235,7 @@ onMounted(initializeAuth)
               </dl>
             </section>
           </section>
-        </template>
+        </Transition>
       </section>
     </template>
   </main>

@@ -52,6 +52,7 @@ button:disabled {
 .app-shell {
   min-height: 100vh;
   display: flex;
+  align-items: flex-start;
   color: var(--text);
 }
 
@@ -61,6 +62,49 @@ button:disabled {
   display: grid;
   place-items: center;
   padding: 24px;
+}
+
+.not-found-screen {
+  width: 100%;
+  min-height: 100vh;
+  display: grid;
+  place-items: center;
+  padding: 24px;
+}
+
+.not-found-panel {
+  width: min(100%, 520px);
+  display: grid;
+  justify-items: center;
+  gap: 12px;
+  padding: 30px;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: var(--surface);
+  text-align: center;
+  box-shadow: 0 20px 50px rgba(15, 23, 42, 0.08);
+  animation: panelRise 0.24s ease both;
+}
+
+.not-found-panel span {
+  color: var(--blue);
+  font-weight: 900;
+  letter-spacing: 0.08em;
+}
+
+.not-found-panel h1,
+.not-found-panel p {
+  margin: 0;
+}
+
+.not-found-panel h1 {
+  font-size: 34px;
+  letter-spacing: 0;
+}
+
+.not-found-panel p {
+  color: var(--muted);
+  line-height: 1.6;
 }
 
 .auth-panel {
@@ -94,8 +138,9 @@ button:disabled {
 }
 
 .sidebar {
+  flex: 0 0 246px;
   width: 246px;
-  min-height: 100vh;
+  height: 100vh;
   position: sticky;
   top: 0;
   display: flex;
@@ -105,6 +150,7 @@ button:disabled {
   border-right: 1px solid var(--line);
   background: var(--surface);
   z-index: 20;
+  overflow-y: auto;
 }
 .sidebar.is-open {
   left: 0;
@@ -132,6 +178,10 @@ button:disabled {
   font-weight: 800;
 }
 
+.brand-mark .bi {
+  font-size: 20px;
+}
+
 .nav-list {
   display: grid;
   gap: 6px;
@@ -149,6 +199,12 @@ button:disabled {
   color: #334155;
   font-weight: 700;
   text-align: left;
+}
+
+.nav-item .bi {
+  width: 18px;
+  font-size: 17px;
+  text-align: center;
 }
 
 .nav-item:hover,
@@ -224,6 +280,22 @@ button:disabled {
   min-height: 40px;
   border-radius: 8px;
   font-weight: 800;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  transition:
+    transform 0.16s ease,
+    border-color 0.16s ease,
+    background-color 0.16s ease,
+    color 0.16s ease,
+    box-shadow 0.16s ease;
+}
+
+.primary-button:hover,
+.ghost-button:hover,
+.link-button:hover {
+  transform: translateY(-1px);
 }
 
 .primary-button {
@@ -306,11 +378,75 @@ button:disabled {
   gap: 16px;
 }
 
+.view-slide-enter-active,
+.view-slide-leave-active {
+  transition:
+    opacity 0.18s ease,
+    transform 0.18s ease;
+}
+
+.view-slide-enter-from {
+  opacity: 0;
+  transform: translateY(10px);
+}
+
+.view-slide-leave-to {
+  opacity: 0;
+  transform: translateY(-6px);
+}
+
+.panel-pop-enter-active,
+.panel-pop-leave-active,
+.message-slide-enter-active,
+.message-slide-leave-active {
+  transition:
+    opacity 0.18s ease,
+    transform 0.18s ease;
+}
+
+.panel-pop-enter-from,
+.panel-pop-leave-to {
+  opacity: 0;
+  transform: translateY(-10px) scale(0.99);
+}
+
+.message-slide-enter-from,
+.message-slide-leave-to {
+  opacity: 0;
+  transform: translateY(-6px);
+}
+
+@keyframes panelRise {
+  from {
+    opacity: 0;
+    transform: translateY(10px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+@keyframes spin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+.spin {
+  animation: spin 0.8s linear infinite;
+}
+
 .panel {
   overflow: hidden;
   border: 1px solid var(--line);
   border-radius: 8px;
   background: var(--surface);
+}
+
+.panel,
+.metric-row {
+  animation: panelRise 0.22s ease both;
 }
 
 .section-header {
@@ -384,7 +520,7 @@ button:disabled {
   background: var(--surface);
 }
 
-.search-box span {
+.search-box .bi {
   color: var(--muted);
 }
 
@@ -466,6 +602,14 @@ button:disabled {
   border: 2px solid #b8c6d9;
   border-radius: 50%;
   background: white;
+  transition:
+    transform 0.16s ease,
+    background-color 0.16s ease,
+    border-color 0.16s ease;
+}
+
+.status-dot:hover {
+  transform: scale(1.08);
 }
 
 .status-dot.in_progress {
@@ -617,6 +761,33 @@ input,
 select {
   height: 42px;
   padding: 0 11px;
+}
+
+.password-field {
+  position: relative;
+}
+
+.password-field input {
+  padding-right: 48px;
+}
+
+.password-toggle {
+  width: 40px;
+  height: 40px;
+  position: absolute;
+  right: 1px;
+  top: 1px;
+  display: grid;
+  place-items: center;
+  border: 0;
+  border-left: 1px solid var(--line);
+  border-radius: 0 8px 8px 0;
+  background: transparent;
+  color: var(--muted);
+}
+
+.password-toggle:hover {
+  color: var(--blue);
 }
 
 textarea {
@@ -840,7 +1011,7 @@ textarea:focus {
   .metric-row {
     grid-template-columns: repeat(2, minmax(0, 1fr));
   }
-  .menu-button{
+  .menu-button {
     display: none;
   }
 }
@@ -866,8 +1037,9 @@ textarea:focus {
   .menu-button {
     width: 40px;
     min-height: 40px;
-    display: grid;
-    place-items: center;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
     border: 1px solid var(--line-strong);
     border-radius: 8px;
     background: white;

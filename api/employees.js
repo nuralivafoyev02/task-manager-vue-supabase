@@ -1,7 +1,9 @@
 import {
   adminClient,
   getActor,
+  loginToAuthEmail,
   methodNotAllowed,
+  normalizeLoginIdentifier,
   normalizeTelegramUsername,
   readJsonBody,
   sendActorError,
@@ -22,18 +24,23 @@ export default async function handler(req, res) {
 
     const body = await readJsonBody(req)
     const fullName = String(body.full_name || '').trim()
-    const loginEmail = String(body.login_email || '').trim().toLowerCase()
+    const login = normalizeLoginIdentifier(body.login_email)
+    const authEmail = loginToAuthEmail(login)
+    const authLogin = authEmail.split('@')[0]
     const password = String(body.password || '')
     const role = body.role === 'manager' ? 'manager' : 'employee'
     const phone = String(body.phone || '').trim()
     const telegramUsername = normalizeTelegramUsername(body.telegram_username)
 
     if (fullName.length < 2) return sendJson(res, 400, { error: 'Employee full name is required' })
-    if (!loginEmail.includes('@')) return sendJson(res, 400, { error: 'Valid login email is required' })
-    if (password.length < 8) return sendJson(res, 400, { error: 'Password must be at least 8 characters' })
+    if (login.length < 3) return sendJson(res, 400, { error: 'Login must be at least 3 characters' })
+    if (authLogin.length < 3 || !/[a-z0-9]/.test(authLogin)) {
+      return sendJson(res, 400, { error: 'Login must include letters or numbers' })
+    }
+    if (password.length < 6) return sendJson(res, 400, { error: 'Password must be at least 6 characters' })
 
     const { data: created, error: createError } = await supabase.auth.admin.createUser({
-      email: loginEmail,
+      email: authEmail,
       password,
       email_confirm: true,
       user_metadata: { full_name: fullName, phone, telegram_username: telegramUsername }
@@ -46,7 +53,7 @@ export default async function handler(req, res) {
     const profilePayload = {
       id: created.user.id,
       full_name: fullName,
-      login_email: loginEmail,
+      login_email: login,
       phone: phone || null,
       telegram_username: telegramUsername || null,
       role,
