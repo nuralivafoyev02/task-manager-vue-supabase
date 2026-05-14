@@ -338,10 +338,22 @@ export async function updateTask(
   return data as Task
 }
 
-export async function updateTaskStatus(task: Task, status: PersistedTaskStatus) {
+export async function updateTaskStatus(task: Task, status: PersistedTaskStatus, cancelReason = '') {
+  const updatePayload: {
+    status: PersistedTaskStatus
+    completed_at: string | null
+    cancel_reason?: string | null
+  } = {
+    status,
+    completed_at: status === 'completed' ? new Date().toISOString() : null
+  }
+
+  if (status === 'canceled') updatePayload.cancel_reason = cancelReason.trim() || null
+  else if (task.status === 'canceled' || task.cancel_reason) updatePayload.cancel_reason = null
+
   const { data, error } = await supabase
     .from('tasks')
-    .update({ status, completed_at: status === 'completed' ? new Date().toISOString() : null })
+    .update(updatePayload)
     .eq('id', task.id)
     .select(taskSelect)
     .single()

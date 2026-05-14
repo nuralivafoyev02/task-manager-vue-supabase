@@ -76,6 +76,12 @@ const copy: Record<AppLanguage, Record<string, string>> = {
     status: 'Status',
     title: 'Vazifa nomi',
     description: 'Izoh',
+    cancelReason: 'Bekor qilish izohi',
+    cancelReasonHelp: 'Vazifa nima sababdan bekor qilinayotganini yozing.',
+    cancelReasonPlaceholder: 'Masalan: mijoz javob bermadi yoki vazifa dolzarbligini yo‘qotdi',
+    cancelReasonRequired: 'Bekor qilish izohini kiriting.',
+    cancelReasonEmpty: 'Bekor qilish izohi kiritilmagan.',
+    confirmCancel: 'Bekor qilishni tasdiqlash',
     checklist: 'Checklist',
     fullName: 'Ism familiya',
     phone: 'Telefon',
@@ -105,7 +111,7 @@ const copy: Record<AppLanguage, Record<string, string>> = {
     appearance: 'Ko‘rinish',
     security: 'Xavfsizlik',
     account: 'Akkaunt',
-    theme: 'Tema',
+    theme: 'Mavzu',
     light: 'Light',
     dark: 'Dark',
     openProfileMenu: 'Profil menyusi',
@@ -148,8 +154,8 @@ const copy: Record<AppLanguage, Record<string, string>> = {
     delete: 'O‘chirish',
     previousMonth: 'Oldingi oy',
     nextMonth: 'Keyingi oy',
-    taskTitlePlaceholder: 'CRM hisobotini tayyorlash',
-    fullNamePlaceholder: 'Ali Valiyev',
+    taskTitlePlaceholder: 'Vazifa nomi',
+    fullNamePlaceholder: 'Falonchiyev Pistonchi',
     passwordMinPlaceholder: 'Kamida 6 belgi',
     newPasswordPlaceholder: 'Yangi parol',
     showPassword: 'Parolni ko‘rsatish',
@@ -189,6 +195,12 @@ const copy: Record<AppLanguage, Record<string, string>> = {
     status: 'Статус',
     title: 'Название задачи',
     description: 'Описание',
+    cancelReason: 'Причина отмены',
+    cancelReasonHelp: 'Напишите, почему задача отменяется.',
+    cancelReasonPlaceholder: 'Например: клиент не ответил или задача потеряла актуальность',
+    cancelReasonRequired: 'Введите причину отмены.',
+    cancelReasonEmpty: 'Причина отмены не указана.',
+    confirmCancel: 'Подтвердить отмену',
     checklist: 'Checklist',
     fullName: 'ФИО',
     phone: 'Телефон',
@@ -261,8 +273,8 @@ const copy: Record<AppLanguage, Record<string, string>> = {
     delete: 'Удалить',
     previousMonth: 'Предыдущий месяц',
     nextMonth: 'Следующий месяц',
-    taskTitlePlaceholder: 'Подготовить CRM отчет',
-    fullNamePlaceholder: 'Али Валиев',
+    taskTitlePlaceholder: 'Имя задачи',
+    fullNamePlaceholder: 'Фалончиев Пистончи',
     passwordMinPlaceholder: 'Минимум 6 символов',
     newPasswordPlaceholder: 'Новый пароль',
     showPassword: 'Показать пароль',
@@ -302,6 +314,12 @@ const copy: Record<AppLanguage, Record<string, string>> = {
     status: 'Статус',
     title: 'Вазифа номи',
     description: 'Изоҳ',
+    cancelReason: 'Бекор қилиш изоҳи',
+    cancelReasonHelp: 'Вазифа нима сабабдан бекор қилинаётганини ёзинг.',
+    cancelReasonPlaceholder: 'Масалан: мижоз жавоб бермади ёки вазифа долзарблигини йўқотди',
+    cancelReasonRequired: 'Бекор қилиш изоҳини киритинг.',
+    cancelReasonEmpty: 'Бекор қилиш изоҳи киритилмаган.',
+    confirmCancel: 'Бекор қилишни тасдиқлаш',
     checklist: 'Checklist',
     fullName: 'Исм фамилия',
     phone: 'Телефон',
@@ -374,8 +392,8 @@ const copy: Record<AppLanguage, Record<string, string>> = {
     delete: 'Ўчириш',
     previousMonth: 'Олдинги ой',
     nextMonth: 'Кейинги ой',
-    taskTitlePlaceholder: 'CRM ҳисоботини тайёрлаш',
-    fullNamePlaceholder: 'Али Валиев',
+    taskTitlePlaceholder: 'Вазифа номи',
+    fullNamePlaceholder: 'Фалончиев Пистончи',
     passwordMinPlaceholder: 'Камида 6 белги',
     newPasswordPlaceholder: 'Янги парол',
     showPassword: 'Паролни кўрсатиш',
@@ -413,6 +431,8 @@ const showTaskComposer = ref(false)
 const showEmployeeComposer = ref(false)
 const editingTaskId = ref<string | null>(null)
 const taskActionMenuId = ref<string | null>(null)
+const cancelDialogTask = ref<Task | null>(null)
+const cancelReason = ref('')
 const selectedCalendarDate = ref(toIsoDate(new Date()))
 const calendarCursor = ref(new Date(new Date().getFullYear(), new Date().getMonth(), 1))
 
@@ -463,15 +483,15 @@ const overdueTasks = computed(() => tasks.value.filter((task) => isOverdue(task)
 const navItems = computed<Array<{ key: ViewKey; label: string; icon: string }>>(() => {
   const base: Array<{ key: ViewKey; label: string; icon: string }> = isManager.value
     ? [
-        { key: 'dashboard', label: t('dashboard'), icon: 'bi-speedometer2' },
-        { key: 'tasks', label: t('tasks'), icon: 'bi-check2-square' },
-        { key: 'employees', label: t('employees'), icon: 'bi-people' },
-        { key: 'calendar', label: t('calendar'), icon: 'bi-calendar3' }
-      ]
+      { key: 'dashboard', label: t('dashboard'), icon: 'bi-speedometer2' },
+      { key: 'tasks', label: t('tasks'), icon: 'bi-check2-square' },
+      { key: 'employees', label: t('employees'), icon: 'bi-people' },
+      { key: 'calendar', label: t('calendar'), icon: 'bi-calendar3' }
+    ]
     : [
-        { key: 'tasks', label: t('tasks'), icon: 'bi-check2-square' },
-        { key: 'calendar', label: t('calendar'), icon: 'bi-calendar3' }
-      ]
+      { key: 'tasks', label: t('tasks'), icon: 'bi-check2-square' },
+      { key: 'calendar', label: t('calendar'), icon: 'bi-calendar3' }
+    ]
 
   return [...base, { key: 'settings', label: t('settings'), icon: 'bi-gear' }]
 })
@@ -618,6 +638,12 @@ function taskDisplayStatus(task: Task): TaskStatus {
 
 function statusLabel(status: TaskStatus) {
   return t(status)
+}
+
+function showCancelReason(task: Task, event?: MouseEvent) {
+  if (taskDisplayStatus(task) !== 'canceled') return
+  event?.stopPropagation()
+  showToast('info', `${t('cancelReason')}: ${task.cancel_reason || t('cancelReasonEmpty')}`)
 }
 
 function priorityLabel(priority: TaskPriority) {
@@ -884,18 +910,42 @@ async function changeStatus(task: Task, status: PersistedTaskStatus) {
   }
 }
 
-async function cancelTask(task: Task) {
+function cancelTask(task: Task) {
   resetMessages()
   taskActionMenuId.value = null
+  cancelDialogTask.value = task
+  cancelReason.value = task.cancel_reason || ''
+}
+
+function closeCancelDialog() {
+  cancelDialogTask.value = null
+  cancelReason.value = ''
+}
+
+async function confirmCancelTask() {
+  const task = cancelDialogTask.value
+  if (!task) return
+
+  const reason = cancelReason.value.trim()
+  if (!reason) {
+    errorMessage.value = t('cancelReasonRequired')
+    return
+  }
+
+  resetMessages()
+  saving.value = true
   try {
-    const updatedTask = await updateTaskStatus(task, 'canceled')
+    const updatedTask = await updateTaskStatus(task, 'canceled', reason)
     tasks.value = tasks.value.map((currentTask) =>
       currentTask.id === task.id ? { ...currentTask, ...updatedTask, checklist: currentTask.checklist } : currentTask
     )
     noticeMessage.value = t('taskCanceled')
+    closeCancelDialog()
     await refreshData()
   } catch (error) {
     errorMessage.value = error instanceof Error ? error.message : t('cannotCancel')
+  } finally {
+    saving.value = false
   }
 }
 
@@ -997,23 +1047,45 @@ watch(errorMessage, (message) => {
 </script>
 
 <template>
-  <main :class="['app-shell', `theme-${themeMode}`, settingsForm.performance_mode === 'compact' && 'performance-compact']">
+  <main
+    :class="['app-shell', `theme-${themeMode}`, settingsForm.performance_mode === 'compact' && 'performance-compact']">
     <div class="toast-stack" aria-live="polite">
       <TransitionGroup name="toast">
-        <button
-          v-for="toast in toasts"
-          :key="toast.id"
-          :class="['toast-card', toast.type]"
-          @click="dismissToast(toast.id)"
-          @pointerdown="startToastSwipe(toast, $event)"
-          @pointerup="endToastSwipe(toast, $event)"
-        >
-          <i :class="['bi', toast.type === 'success' ? 'bi-check-circle' : toast.type === 'error' ? 'bi-exclamation-circle' : 'bi-info-circle']"></i>
+        <button v-for="toast in toasts" :key="toast.id" :class="['toast-card', toast.type]"
+          @click="dismissToast(toast.id)" @pointerdown="startToastSwipe(toast, $event)"
+          @pointerup="endToastSwipe(toast, $event)">
+          <i
+            :class="['bi', toast.type === 'success' ? 'bi-check-circle' : toast.type === 'error' ? 'bi-exclamation-circle' : 'bi-info-circle']"></i>
           <span>{{ toast.message }}</span>
           <i class="bi bi-x-lg toast-close"></i>
         </button>
       </TransitionGroup>
     </div>
+
+    <Transition name="panel-pop">
+      <div v-if="cancelDialogTask" class="modal-scrim" @click.self="closeCancelDialog">
+        <form class="modal-panel cancel-modal" @submit.prevent="confirmCancelTask">
+          <div class="section-header clean">
+            <div>
+              <h2>{{ t('cancelReason') }}</h2>
+              <p>{{ t('cancelReasonHelp') }}</p>
+            </div>
+            <button type="button" class="ghost-button icon-only" @click="closeCancelDialog" :aria-label="t('close')">
+              <i class="bi bi-x-lg"></i>
+            </button>
+          </div>
+          <strong class="modal-task-title">{{ cancelDialogTask.title }}</strong>
+          <textarea v-model="cancelReason" rows="4" :placeholder="t('cancelReasonPlaceholder')" autofocus></textarea>
+          <div class="modal-actions">
+            <button type="button" class="ghost-button" @click="closeCancelDialog">{{ t('close') }}</button>
+            <button class="primary-button danger-button" :disabled="saving">
+              <i class="bi bi-x-circle"></i>
+              {{ saving ? '...' : t('confirmCancel') }}
+            </button>
+          </div>
+        </form>
+      </div>
+    </Transition>
 
     <section v-if="isNotFoundRoute" class="not-found-screen">
       <div class="not-found-panel">
@@ -1067,12 +1139,8 @@ watch(errorMessage, (message) => {
         </div>
 
         <nav class="nav-list">
-          <button
-            v-for="item in navItems"
-            :key="item.key"
-            :class="['nav-item', { active: activeView === item.key }]"
-            @click="selectView(item.key)"
-          >
+          <button v-for="item in navItems" :key="item.key" :class="['nav-item', { active: activeView === item.key }]"
+            @click="selectView(item.key)">
             <i :class="['bi', item.icon]"></i>
             {{ item.label }}
           </button>
@@ -1090,12 +1158,8 @@ watch(errorMessage, (message) => {
         </div>
       </aside>
       <Transition name="fade">
-        <button
-          v-if="mobileMenuOpen"
-          class="sidebar-scrim"
-          :aria-label="t('closeMenu')"
-          @click="mobileMenuOpen = false"
-        ></button>
+        <button v-if="mobileMenuOpen" class="sidebar-scrim" :aria-label="t('closeMenu')"
+          @click="mobileMenuOpen = false"></button>
       </Transition>
 
       <section class="workspace">
@@ -1108,7 +1172,8 @@ watch(errorMessage, (message) => {
             <p>{{ pageDescription }}</p>
           </div>
           <div class="topbar-actions">
-            <button class="profile-trigger" :aria-label="t('openProfileMenu')" @click="profileMenuOpen = !profileMenuOpen">
+            <button class="profile-trigger" :aria-label="t('openProfileMenu')"
+              @click="profileMenuOpen = !profileMenuOpen">
               <span class="avatar small">
                 <img v-if="profile?.avatar_url" :src="profile.avatar_url" alt="" />
                 <span v-else>{{ getInitials(profile?.full_name) }}</span>
@@ -1116,7 +1181,8 @@ watch(errorMessage, (message) => {
               <i class="bi bi-chevron-down"></i>
             </button>
             <Transition name="fade">
-              <button v-if="profileMenuOpen" class="profile-menu-scrim" :aria-label="t('close')" @click="profileMenuOpen = false"></button>
+              <button v-if="profileMenuOpen" class="profile-menu-scrim" :aria-label="t('close')"
+                @click="profileMenuOpen = false"></button>
             </Transition>
             <Transition name="panel-pop">
               <div v-if="profileMenuOpen" class="profile-menu">
@@ -1141,7 +1207,8 @@ watch(errorMessage, (message) => {
                 <div class="profile-menu-theme">
                   <span>{{ t('theme') }}</span>
                   <div>
-                    <button :class="{ active: themeMode === 'light' }" @click="setTheme('light')">{{ t('light') }}</button>
+                    <button :class="{ active: themeMode === 'light' }" @click="setTheme('light')">{{ t('light')
+                      }}</button>
                     <button :class="{ active: themeMode === 'dark' }" @click="setTheme('dark')">{{ t('dark') }}</button>
                   </div>
                 </div>
@@ -1186,23 +1253,20 @@ watch(errorMessage, (message) => {
                 </button>
               </div>
               <div class="task-list">
-                <article
-                  v-for="task in filteredTasks"
-                  :key="task.id"
-                  :class="['task-row', { selected: selectedTask?.id === task.id }]"
-                  @click="selectedTaskId = task.id"
-                >
-                  <button
-                    class="status-dot"
-                    :class="taskDisplayStatus(task)"
+                <article v-for="task in filteredTasks" :key="task.id"
+                  :class="['task-row', { selected: selectedTask?.id === task.id }]" @click="selectedTaskId = task.id">
+                  <button class="status-dot" :class="taskDisplayStatus(task)"
                     @click.stop="changeStatus(task, task.status === 'completed' ? 'todo' : 'completed')"
-                    :title="statusLabel(taskDisplayStatus(task))"
-                  ></button>
+                    :title="statusLabel(taskDisplayStatus(task))"></button>
                   <div class="task-main">
                     <strong :class="{ done: task.status === 'completed' }">{{ task.title }}</strong>
-                    <span>{{ task.assignee?.full_name || employeeMap.get(task.assignee_id || '')?.full_name || '—' }}</span>
+                    <span>{{ task.assignee?.full_name || employeeMap.get(task.assignee_id || '')?.full_name || '—'
+                      }}</span>
                   </div>
-                  <span :class="['status-pill', taskDisplayStatus(task)]">{{ statusLabel(taskDisplayStatus(task)) }}</span>
+                  <button type="button" :class="['status-pill', taskDisplayStatus(task)]"
+                    @click="showCancelReason(task, $event)">
+                    {{ statusLabel(taskDisplayStatus(task)) }}
+                  </button>
                   <span>{{ formatDate(task.due_date) }}</span>
                 </article>
               </div>
@@ -1212,56 +1276,58 @@ watch(errorMessage, (message) => {
           <section v-else-if="activeView === 'tasks'" key="tasks" class="view-stack">
             <Transition name="panel-pop">
               <form v-if="showTaskComposer" class="panel form-panel" @submit.prevent="submitTask">
-              <div class="section-header">
-                <h2>{{ editingTaskId ? t('editTask') : t('newTask') }}</h2>
-                <button type="button" class="ghost-button icon-only" @click="showTaskComposer = false" :aria-label="t('close')">
-                  <i class="bi bi-x-lg"></i>
+                <div class="section-header">
+                  <h2>{{ editingTaskId ? t('editTask') : t('newTask') }}</h2>
+                  <button type="button" class="ghost-button icon-only" @click="showTaskComposer = false"
+                    :aria-label="t('close')">
+                    <i class="bi bi-x-lg"></i>
+                  </button>
+                </div>
+
+                <div class="form-grid">
+                  <label>
+                    {{ t('title') }}
+                    <input v-model="taskForm.title" :placeholder="t('taskTitlePlaceholder')" />
+                  </label>
+                  <label v-if="isManager">
+                    {{ t('assignee') }}
+                    <select v-model="taskForm.assignee_id">
+                      <option value="">—</option>
+                      <option v-for="employee in assigneeOptions" :key="employee.id" :value="employee.id">
+                        {{ employee.full_name || employee.login_email }}
+                      </option>
+                    </select>
+                  </label>
+                  <label>
+                    {{ t('dueDate') }}
+                    <input v-model="taskForm.due_date" type="date" />
+                  </label>
+                  <label>
+                    {{ t('priority') }}
+                    <select v-model="taskForm.priority">
+                      <option value="low">{{ t('low') }}</option>
+                      <option value="medium">{{ t('medium') }}</option>
+                      <option value="high">{{ t('high') }}</option>
+                    </select>
+                  </label>
+                </div>
+
+                <label>
+                  {{ t('description') }}
+                  <textarea v-model="taskForm.description" rows="3"></textarea>
+                </label>
+
+                <label>
+                  {{ t('checklist') }}
+                  <textarea v-model="taskForm.checklistText" rows="4"
+                    :placeholder="t('checklistPlaceholder')"></textarea>
+                  <small class="field-help">{{ t('checklistHelp') }}</small>
+                </label>
+
+                <button class="primary-button fit" :disabled="saving">
+                  <i class="bi bi-save"></i>
+                  {{ saving ? '...' : editingTaskId ? t('editTask') : t('saveTask') }}
                 </button>
-              </div>
-
-              <div class="form-grid">
-                <label>
-                  {{ t('title') }}
-                  <input v-model="taskForm.title" :placeholder="t('taskTitlePlaceholder')" />
-                </label>
-                <label v-if="isManager">
-                  {{ t('assignee') }}
-                  <select v-model="taskForm.assignee_id">
-                    <option value="">—</option>
-                    <option v-for="employee in assigneeOptions" :key="employee.id" :value="employee.id">
-                      {{ employee.full_name || employee.login_email }}
-                    </option>
-                  </select>
-                </label>
-                <label>
-                  {{ t('dueDate') }}
-                  <input v-model="taskForm.due_date" type="date" />
-                </label>
-                <label>
-                  {{ t('priority') }}
-                  <select v-model="taskForm.priority">
-                    <option value="low">{{ t('low') }}</option>
-                    <option value="medium">{{ t('medium') }}</option>
-                    <option value="high">{{ t('high') }}</option>
-                  </select>
-                </label>
-              </div>
-
-              <label>
-                {{ t('description') }}
-                <textarea v-model="taskForm.description" rows="3"></textarea>
-              </label>
-
-              <label>
-                {{ t('checklist') }}
-                <textarea v-model="taskForm.checklistText" rows="4" :placeholder="t('checklistPlaceholder')"></textarea>
-                <small class="field-help">{{ t('checklistHelp') }}</small>
-              </label>
-
-              <button class="primary-button fit" :disabled="saving">
-                <i class="bi bi-save"></i>
-                {{ saving ? '...' : editingTaskId ? t('editTask') : t('saveTask') }}
-              </button>
               </form>
             </Transition>
 
@@ -1295,31 +1361,31 @@ watch(errorMessage, (message) => {
 
                 <div v-if="!filteredTasks.length" class="empty-state">{{ t('noTasks') }}</div>
                 <div v-else class="task-list">
-                  <article
-                    v-for="task in filteredTasks"
-                    :key="task.id"
-                    :class="['task-row', { selected: selectedTask?.id === task.id }]"
-                    @click="selectedTaskId = task.id"
-                  >
-                    <button
-                      class="status-dot"
-                      :class="taskDisplayStatus(task)"
+                  <article v-for="task in filteredTasks" :key="task.id"
+                    :class="['task-row', { selected: selectedTask?.id === task.id }]" @click="selectedTaskId = task.id">
+                    <button class="status-dot" :class="taskDisplayStatus(task)"
                       @click.stop="changeStatus(task, task.status === 'completed' ? 'todo' : 'completed')"
-                      :title="statusLabel(taskDisplayStatus(task))"
-                    ></button>
+                      :title="statusLabel(taskDisplayStatus(task))"></button>
                     <div class="task-main">
                       <strong :class="{ done: task.status === 'completed' }">{{ task.title }}</strong>
-                      <span>{{ task.assignee?.full_name || employeeMap.get(task.assignee_id || '')?.full_name || '—' }}</span>
+                      <span>{{ task.assignee?.full_name || employeeMap.get(task.assignee_id || '')?.full_name || '—'
+                        }}</span>
                     </div>
-                    <span :class="['status-pill', taskDisplayStatus(task)]">{{ statusLabel(taskDisplayStatus(task)) }}</span>
+                    <button type="button" :class="['status-pill', taskDisplayStatus(task)]"
+                      @click="showCancelReason(task, $event)">
+                      {{ statusLabel(taskDisplayStatus(task)) }}
+                    </button>
                     <span class="muted-text">{{ formatDate(task.due_date) }}</span>
-                    <button class="ghost-button icon-only" @click.stop="taskActionMenuId = taskActionMenuId === task.id ? null : task.id" :aria-label="t('actions')">
+                    <button class="ghost-button icon-only"
+                      @click.stop="taskActionMenuId = taskActionMenuId === task.id ? null : task.id"
+                      :aria-label="t('actions')">
                       <i class="bi bi-three-dots"></i>
                     </button>
                     <div v-if="taskActionMenuId === task.id" class="task-actions-menu" @click.stop>
                       <button @click="startEditTask(task)"><i class="bi bi-pencil"></i>{{ t('editTask') }}</button>
                       <button @click="cancelTask(task)"><i class="bi bi-x-circle"></i>{{ t('cancelTask') }}</button>
-                      <button class="danger-text" @click="removeTask(task)"><i class="bi bi-trash3"></i>{{ t('delete') }}</button>
+                      <button class="danger-text" @click="removeTask(task)"><i class="bi bi-trash3"></i>{{ t('delete')
+                        }}</button>
                     </div>
                   </article>
                 </div>
@@ -1329,13 +1395,17 @@ watch(errorMessage, (message) => {
                 <template v-if="selectedTask">
                   <div class="section-header clean">
                     <h2>{{ selectedTask.title }}</h2>
-                    <span :class="['status-pill', taskDisplayStatus(selectedTask)]">{{ statusLabel(taskDisplayStatus(selectedTask)) }}</span>
+                    <button type="button" :class="['status-pill', taskDisplayStatus(selectedTask)]"
+                      @click="showCancelReason(selectedTask, $event)">
+                      {{ statusLabel(taskDisplayStatus(selectedTask)) }}
+                    </button>
                   </div>
 
                   <dl class="detail-list">
                     <div>
                       <dt>{{ t('assignee') }}</dt>
-                      <dd>{{ selectedTask.assignee?.full_name || employeeMap.get(selectedTask.assignee_id || '')?.full_name || '—' }}</dd>
+                      <dd>{{ selectedTask.assignee?.full_name || employeeMap.get(selectedTask.assignee_id ||
+                        '')?.full_name || '—' }}</dd>
                     </div>
                     <div>
                       <dt>{{ t('dueDate') }}</dt>
@@ -1351,14 +1421,18 @@ watch(errorMessage, (message) => {
 
                   <div class="status-actions">
                     <button class="ghost-button" @click="changeStatus(selectedTask, 'todo')">{{ t('todo') }}</button>
-                    <button class="ghost-button" @click="changeStatus(selectedTask, 'in_progress')">{{ t('in_progress') }}</button>
-                    <button class="primary-button fit" @click="changeStatus(selectedTask, 'completed')">{{ t('completed') }}</button>
-                    <button class="ghost-button danger-text" @click="cancelTask(selectedTask)">{{ t('cancelTask') }}</button>
+                    <button class="ghost-button" @click="changeStatus(selectedTask, 'in_progress')">{{ t('in_progress')
+                      }}</button>
+                    <button class="primary-button fit" @click="changeStatus(selectedTask, 'completed')">{{
+                      t('completed') }}</button>
+                    <button class="ghost-button danger-text" @click="cancelTask(selectedTask)">{{ t('cancelTask')
+                      }}</button>
                   </div>
 
                   <div v-if="selectedTask.checklist?.length" class="checklist-list">
                     <label v-for="item in selectedTask.checklist" :key="item.id" class="checklist-item">
-                      <input :checked="item.is_done" type="checkbox" @change="toggleChecklist(item.id, !item.is_done)" />
+                      <input :checked="item.is_done" type="checkbox"
+                        @change="toggleChecklist(item.id, !item.is_done)" />
                       <span :class="{ done: item.is_done }">{{ item.title }}</span>
                     </label>
                   </div>
@@ -1372,69 +1446,65 @@ watch(errorMessage, (message) => {
           <section v-else-if="activeView === 'employees' && isManager" key="employees" class="view-stack">
             <Transition name="panel-pop">
               <form v-if="showEmployeeComposer" class="panel form-panel employee-form" @submit.prevent="submitEmployee">
-              <div class="section-header">
-                <h2>{{ t('createEmployee') }}</h2>
-                <button type="button" class="ghost-button icon-only" @click="showEmployeeComposer = false" :aria-label="t('close')">
-                  <i class="bi bi-x-lg"></i>
+                <div class="section-header">
+                  <h2>{{ t('createEmployee') }}</h2>
+                  <button type="button" class="ghost-button icon-only" @click="showEmployeeComposer = false"
+                    :aria-label="t('close')">
+                    <i class="bi bi-x-lg"></i>
+                  </button>
+                </div>
+
+                <div class="form-grid">
+                  <label>
+                    {{ t('fullName') }}
+                    <input v-model="employeeForm.full_name" :placeholder="t('fullNamePlaceholder')" />
+                  </label>
+                  <label>
+                    {{ t('email') }}
+                    <input v-model="employeeForm.login_email" type="text" autocomplete="username"
+                      placeholder="ali.valiyev" />
+                  </label>
+                  <label>
+                    {{ t('password') }}
+                    <div class="password-field">
+                      <input v-model="employeeForm.password" :type="employeePasswordVisible ? 'text' : 'password'"
+                        autocomplete="new-password" :placeholder="t('passwordMinPlaceholder')" />
+                      <button type="button" class="password-toggle"
+                        :aria-label="employeePasswordVisible ? t('hidePassword') : t('showPassword')"
+                        @click="employeePasswordVisible = !employeePasswordVisible">
+                        <i :class="['bi', employeePasswordVisible ? 'bi-eye-slash' : 'bi-eye']"></i>
+                      </button>
+                    </div>
+                  </label>
+                  <label>
+                    {{ t('role') }}
+                    <select v-model="employeeForm.role">
+                      <option value="employee">{{ t('employee') }}</option>
+                      <option value="manager">{{ t('manager') }}</option>
+                    </select>
+                  </label>
+                  <label>
+                    {{ t('phone') }}
+                    <input v-model="employeeForm.phone" placeholder="+998901234567" />
+                  </label>
+                  <label>
+                    {{ t('telegram') }}
+                    <input v-model="employeeForm.telegram_username" placeholder="@username" />
+                  </label>
+                </div>
+
+                <button class="primary-button fit" :disabled="saving">
+                  <i class="bi bi-person-plus"></i>
+                  {{ saving ? '...' : t('createEmployee') }}
                 </button>
-              </div>
-
-              <div class="form-grid">
-                <label>
-                  {{ t('fullName') }}
-                  <input v-model="employeeForm.full_name" :placeholder="t('fullNamePlaceholder')" />
-                </label>
-                <label>
-                  {{ t('email') }}
-                  <input v-model="employeeForm.login_email" type="text" autocomplete="username" placeholder="ali.valiyev" />
-                </label>
-                <label>
-                  {{ t('password') }}
-                  <div class="password-field">
-                    <input
-                      v-model="employeeForm.password"
-                      :type="employeePasswordVisible ? 'text' : 'password'"
-                      autocomplete="new-password"
-                      :placeholder="t('passwordMinPlaceholder')"
-                    />
-                    <button
-                      type="button"
-                      class="password-toggle"
-                      :aria-label="employeePasswordVisible ? t('hidePassword') : t('showPassword')"
-                      @click="employeePasswordVisible = !employeePasswordVisible"
-                    >
-                      <i :class="['bi', employeePasswordVisible ? 'bi-eye-slash' : 'bi-eye']"></i>
-                    </button>
-                  </div>
-                </label>
-                <label>
-                  {{ t('role') }}
-                  <select v-model="employeeForm.role">
-                    <option value="employee">{{ t('employee') }}</option>
-                    <option value="manager">{{ t('manager') }}</option>
-                  </select>
-                </label>
-                <label>
-                  {{ t('phone') }}
-                  <input v-model="employeeForm.phone" placeholder="+998901234567" />
-                </label>
-                <label>
-                  {{ t('telegram') }}
-                  <input v-model="employeeForm.telegram_username" placeholder="@username" />
-                </label>
-              </div>
-
-              <button class="primary-button fit" :disabled="saving">
-                <i class="bi bi-person-plus"></i>
-                {{ saving ? '...' : t('createEmployee') }}
-              </button>
               </form>
             </Transition>
 
             <section class="panel employees-panel">
-                <div class="section-header">
-                  <h2>{{ t('employees') }}</h2>
-                <button v-if="!showEmployeeComposer" class="primary-button fit" @click="showEmployeeComposer = true; resetEmployeeForm()">
+              <div class="section-header">
+                <h2>{{ t('employees') }}</h2>
+                <button v-if="!showEmployeeComposer" class="primary-button fit"
+                  @click="showEmployeeComposer = true; resetEmployeeForm()">
                   <i class="bi bi-person-plus"></i>
                   {{ t('createEmployee') }}
                 </button>
@@ -1455,7 +1525,9 @@ watch(errorMessage, (message) => {
                   </div>
                   <span class="role-pill">{{ roleLabel(employee.role) }}</span>
                   <span class="employee-contact"><i class="bi bi-telephone"></i>{{ employee.phone || '—' }}</span>
-                  <span class="employee-contact"><i class="bi bi-telegram"></i>{{ displayTelegram(employee.telegram_username) }}</span>
+                  <span class="employee-contact"><i class="bi bi-telegram"></i>{{
+                    displayTelegram(employee.telegram_username)
+                    }}</span>
                 </article>
               </div>
             </section>
@@ -1478,12 +1550,9 @@ watch(errorMessage, (message) => {
               </div>
 
               <div class="calendar-grid">
-                <button
-                  v-for="day in calendarDays"
-                  :key="day.iso"
+                <button v-for="day in calendarDays" :key="day.iso"
                   :class="['calendar-day', { muted: !day.currentMonth, today: day.today, selected: selectedCalendarDate === day.iso }]"
-                  @click="selectedCalendarDate = day.iso"
-                >
+                  @click="selectedCalendarDate = day.iso">
                   <span>{{ formatDay(day.date) }}</span>
                   <div class="calendar-avatars">
                     <span v-for="employee in day.avatars" :key="employee.id" class="avatar micro">
@@ -1502,13 +1571,20 @@ watch(errorMessage, (message) => {
 
               <div v-if="!selectedCalendarTasks.length" class="empty-state compact">{{ t('calendarEmpty') }}</div>
               <div v-else class="day-task-list">
-                <article v-for="task in selectedCalendarTasks" :key="task.id" @click="selectedTaskId = task.id; activeView = 'tasks'">
-                  <div class="avatar small">{{ getInitials(task.assignee?.full_name || employeeMap.get(task.assignee_id || '')?.full_name) }}</div>
+                <article v-for="task in selectedCalendarTasks" :key="task.id"
+                  @click="selectedTaskId = task.id; activeView = 'tasks'">
+                  <div class="avatar small">{{ getInitials(task.assignee?.full_name || employeeMap.get(task.assignee_id
+                    ||
+                    '')?.full_name) }}</div>
                   <div>
                     <strong>{{ task.title }}</strong>
-                    <span>{{ task.assignee?.full_name || employeeMap.get(task.assignee_id || '')?.full_name || '—' }}</span>
+                    <span>{{ task.assignee?.full_name || employeeMap.get(task.assignee_id || '')?.full_name || '—'
+                      }}</span>
                   </div>
-                  <span :class="['status-pill', taskDisplayStatus(task)]">{{ statusLabel(taskDisplayStatus(task)) }}</span>
+                  <button type="button" :class="['status-pill', taskDisplayStatus(task)]"
+                    @click="showCancelReason(task, $event)">
+                    {{ statusLabel(taskDisplayStatus(task)) }}
+                  </button>
                 </article>
               </div>
             </aside>
@@ -1583,18 +1659,11 @@ watch(errorMessage, (message) => {
                 <label>
                   {{ t('password') }}
                   <div class="password-field">
-                    <input
-                      v-model="settingsForm.password"
-                      :type="settingsPasswordVisible ? 'text' : 'password'"
-                      autocomplete="new-password"
-                      :placeholder="t('newPasswordPlaceholder')"
-                    />
-                    <button
-                      type="button"
-                      class="password-toggle"
+                    <input v-model="settingsForm.password" :type="settingsPasswordVisible ? 'text' : 'password'"
+                      autocomplete="new-password" :placeholder="t('newPasswordPlaceholder')" />
+                    <button type="button" class="password-toggle"
                       :aria-label="settingsPasswordVisible ? t('hidePassword') : t('showPassword')"
-                      @click="settingsPasswordVisible = !settingsPasswordVisible"
-                    >
+                      @click="settingsPasswordVisible = !settingsPasswordVisible">
                       <i :class="['bi', settingsPasswordVisible ? 'bi-eye-slash' : 'bi-eye']"></i>
                     </button>
                   </div>

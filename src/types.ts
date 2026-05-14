@@ -41,6 +41,7 @@ export interface Task {
   priority: TaskPriority
   due_date: string | null
   completed_at: string | null
+  cancel_reason: string | null
   created_at: string
   updated_at: string
   project?: Pick<Project, 'id' | 'title' | 'color'> | null
