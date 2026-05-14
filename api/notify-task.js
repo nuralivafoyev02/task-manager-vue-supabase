@@ -2,11 +2,9 @@ import { adminClient, getActor, methodNotAllowed, readJsonBody, sendActorError, 
 
 function formatDate(date) {
   if (!date) return 'sana belgilanmagan'
-  return new Intl.DateTimeFormat('uz-UZ', {
-    year: 'numeric',
-    month: '2-digit',
-    day: '2-digit'
-  }).format(new Date(date))
+  const [year, month, day] = String(date).split('-')
+  if (!year || !month || !day) return String(date)
+  return `${day}.${month}.${year}`
 }
 
 export default async function handler(req, res) {

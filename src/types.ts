@@ -1,4 +1,4 @@
-export type TaskStatus = 'todo' | 'in_progress' | 'completed' | 'overdue'
+export type TaskStatus = 'todo' | 'in_progress' | 'completed' | 'canceled' | 'overdue'
 export type PersistedTaskStatus = Exclude<TaskStatus, 'overdue'>
 export type TaskPriority = 'low' | 'medium' | 'high'
 export type UserRole = 'employee' | 'manager'

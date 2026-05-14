@@ -13,8 +13,9 @@ import {
   normalizeTelegramUsername,
   signInWithPassword,
   signOut,
+  updateAccountCredentials,
   updateChecklistItem,
-  updatePassword,
+  updateTask,
   updateTaskStatus,
   upsertProfile
 } from './services/taskService'
@@ -56,6 +57,9 @@ const copy: Record<AppLanguage, Record<string, string>> = {
     settings: 'Sozlamalar',
     newTask: 'Yangi vazifa',
     saveTask: 'Vazifani saqlash',
+    editTask: 'Vazifani tahrirlash',
+    cancelTask: 'Bekor qilish',
+    actions: 'Amallar',
     createEmployee: 'Xodim yaratish',
     saveProfile: 'Profilni saqlash',
     search: 'Qidirish',
@@ -64,6 +68,7 @@ const copy: Record<AppLanguage, Record<string, string>> = {
     today: 'Bugun',
     active: 'Faol',
     completed: 'Bajarilgan',
+    canceled: 'Bekor qilingan',
     overdue: 'Kechikkan',
     assignee: 'Biriktirilgan',
     dueDate: 'Muddat',
@@ -118,17 +123,24 @@ const copy: Record<AppLanguage, Record<string, string>> = {
     taskTitleRequired: 'Vazifa nomini kiriting.',
     assigneeRequired: 'Xodimni tanlang.',
     taskSaved: 'Vazifa saqlandi.',
+    taskUpdated: 'Vazifa yangilandi.',
     taskCreateError: 'Vazifa yaratishda xatolik.',
     employeeValidation: 'Ism, login va kamida 6 belgili parol kiriting.',
     employeeCreated: 'Xodim yaratildi.',
     employeeCreateError: 'Xodim yaratishda xatolik.',
     statusError: 'Status o‘zgarmadi.',
     taskDeleted: 'Vazifa o‘chirildi.',
+    taskCanceled: 'Vazifa bekor qilindi.',
     taskDeleteError: 'Vazifa o‘chirishda xatolik.',
     checklistError: 'Checklist yangilanmadi.',
     passwordValidation: 'Yangi parol kamida 6 belgidan iborat bo‘lishi kerak.',
     profileSaved: 'Profil saqlandi.',
     profileSaveError: 'Profil saqlanmadi.',
+    profileImage: 'Profil rasmi',
+    changeImage: 'Rasm yuklash',
+    removeImage: 'Rasmni olib tashlash',
+    loginUpdated: 'Login yangilandi.',
+    cannotCancel: 'Vazifani bekor qilib bo‘lmadi.',
     dataLoadError: 'Data loading failed',
     loginFailed: 'Login failed',
     close: 'Yopish',
@@ -158,6 +170,9 @@ const copy: Record<AppLanguage, Record<string, string>> = {
     settings: 'Настройки',
     newTask: 'Новая задача',
     saveTask: 'Сохранить задачу',
+    editTask: 'Редактировать задачу',
+    cancelTask: 'Отменить',
+    actions: 'Действия',
     createEmployee: 'Создать сотрудника',
     saveProfile: 'Сохранить профиль',
     search: 'Поиск',
@@ -166,6 +181,7 @@ const copy: Record<AppLanguage, Record<string, string>> = {
     today: 'Сегодня',
     active: 'Активные',
     completed: 'Готово',
+    canceled: 'Отменено',
     overdue: 'Просрочено',
     assignee: 'Исполнитель',
     dueDate: 'Срок',
@@ -220,17 +236,24 @@ const copy: Record<AppLanguage, Record<string, string>> = {
     taskTitleRequired: 'Введите название задачи.',
     assigneeRequired: 'Выберите сотрудника.',
     taskSaved: 'Задача сохранена.',
+    taskUpdated: 'Задача обновлена.',
     taskCreateError: 'Ошибка при создании задачи.',
     employeeValidation: 'Введите имя, логин и пароль минимум из 6 символов.',
     employeeCreated: 'Сотрудник создан.',
     employeeCreateError: 'Ошибка при создании сотрудника.',
     statusError: 'Статус не изменен.',
     taskDeleted: 'Задача удалена.',
+    taskCanceled: 'Задача отменена.',
     taskDeleteError: 'Ошибка при удалении задачи.',
     checklistError: 'Checklist не обновлен.',
     passwordValidation: 'Новый пароль должен быть минимум 6 символов.',
     profileSaved: 'Профиль сохранен.',
     profileSaveError: 'Профиль не сохранен.',
+    profileImage: 'Фото профиля',
+    changeImage: 'Загрузить фото',
+    removeImage: 'Удалить фото',
+    loginUpdated: 'Логин обновлен.',
+    cannotCancel: 'Не удалось отменить задачу.',
     dataLoadError: 'Ошибка загрузки данных',
     loginFailed: 'Ошибка входа',
     close: 'Закрыть',
@@ -260,6 +283,9 @@ const copy: Record<AppLanguage, Record<string, string>> = {
     settings: 'Созламалар',
     newTask: 'Янги вазифа',
     saveTask: 'Вазифани сақлаш',
+    editTask: 'Вазифани таҳрирлаш',
+    cancelTask: 'Бекор қилиш',
+    actions: 'Амаллар',
     createEmployee: 'Ходим яратиш',
     saveProfile: 'Профилни сақлаш',
     search: 'Қидириш',
@@ -268,6 +294,7 @@ const copy: Record<AppLanguage, Record<string, string>> = {
     today: 'Бугун',
     active: 'Фаол',
     completed: 'Бажарилган',
+    canceled: 'Бекор қилинган',
     overdue: 'Кечиккан',
     assignee: 'Бириктирилган',
     dueDate: 'Муддат',
@@ -322,17 +349,24 @@ const copy: Record<AppLanguage, Record<string, string>> = {
     taskTitleRequired: 'Вазифа номини киритинг.',
     assigneeRequired: 'Ходимни танланг.',
     taskSaved: 'Вазифа сақланди.',
+    taskUpdated: 'Вазифа янгиланди.',
     taskCreateError: 'Вазифа яратишда хатолик.',
     employeeValidation: 'Исм, логин ва камида 6 белгили парол киритинг.',
     employeeCreated: 'Ходим яратилди.',
     employeeCreateError: 'Ходим яратишда хатолик.',
     statusError: 'Статус ўзгармади.',
     taskDeleted: 'Вазифа ўчирилди.',
+    taskCanceled: 'Вазифа бекор қилинди.',
     taskDeleteError: 'Вазифа ўчиришда хатолик.',
     checklistError: 'Checklist янгиланмади.',
     passwordValidation: 'Янги парол камида 6 белгидан иборат бўлиши керак.',
     profileSaved: 'Профил сақланди.',
     profileSaveError: 'Профил сақланмади.',
+    profileImage: 'Профил расми',
+    changeImage: 'Расм юклаш',
+    removeImage: 'Расмни олиб ташлаш',
+    loginUpdated: 'Логин янгиланди.',
+    cannotCancel: 'Вазифани бекор қилиб бўлмади.',
     dataLoadError: 'Data loading failed',
     loginFailed: 'Login failed',
     close: 'Ёпиш',
@@ -377,6 +411,8 @@ const searchQuery = ref('')
 const statusFilter = ref<StatusFilter>('all')
 const showTaskComposer = ref(false)
 const showEmployeeComposer = ref(false)
+const editingTaskId = ref<string | null>(null)
+const taskActionMenuId = ref<string | null>(null)
 const selectedCalendarDate = ref(toIsoDate(new Date()))
 const calendarCursor = ref(new Date(new Date().getFullYear(), new Date().getMonth(), 1))
 
@@ -406,8 +442,10 @@ const employeeForm = reactive<EmployeeCreatePayload>({
 
 const settingsForm = reactive({
   full_name: '',
+  login: '',
   phone: '',
   telegram_username: '',
+  avatar_url: '',
   language: 'uz' as AppLanguage,
   performance_mode: 'balanced' as PerformanceMode,
   password: ''
@@ -417,8 +455,9 @@ const isManager = computed(() => profile.value?.role === 'manager')
 const isNotFoundRoute = computed(() => !['/', '/index.html'].includes(currentPath.value))
 const currentLanguage = computed<AppLanguage>(() => settingsForm.language || profile.value?.language || 'uz')
 const todayIso = computed(() => toIsoDate(new Date()))
-const activeTasks = computed(() => tasks.value.filter((task) => task.status !== 'completed'))
+const activeTasks = computed(() => tasks.value.filter((task) => task.status !== 'completed' && task.status !== 'canceled'))
 const completedTasks = computed(() => tasks.value.filter((task) => task.status === 'completed'))
+const canceledTasks = computed(() => tasks.value.filter((task) => task.status === 'canceled'))
 const overdueTasks = computed(() => tasks.value.filter((task) => isOverdue(task)))
 
 const navItems = computed<Array<{ key: ViewKey; label: string; icon: string }>>(() => {
@@ -488,7 +527,7 @@ const pageDescription = computed(() => {
 })
 
 const calendarTitle = computed(() => {
-  return new Intl.DateTimeFormat(localeName.value, { month: 'long', year: 'numeric' }).format(calendarCursor.value)
+  return `${String(calendarCursor.value.getMonth() + 1).padStart(2, '0')}.${calendarCursor.value.getFullYear()}`
 })
 
 const localeName = computed(() => {
@@ -570,7 +609,7 @@ function goHome() {
 }
 
 function isOverdue(task: Task) {
-  return Boolean(task.due_date && task.due_date < todayIso.value && task.status !== 'completed')
+  return Boolean(task.due_date && task.due_date < todayIso.value && task.status !== 'completed' && task.status !== 'canceled')
 }
 
 function taskDisplayStatus(task: Task): TaskStatus {
@@ -591,9 +630,9 @@ function roleLabel(role?: UserRole | null) {
 
 function formatDate(date: string | null) {
   if (!date) return '—'
-  return new Intl.DateTimeFormat(localeName.value, { day: '2-digit', month: 'short', year: 'numeric' }).format(
-    new Date(`${date}T00:00:00`)
-  )
+  const [year, month, day] = date.split('-')
+  if (!year || !month || !day) return date
+  return `${day}.${month}.${year}`
 }
 
 function formatDay(date: Date) {
@@ -641,23 +680,26 @@ function nextMonth() {
 
 function fillSettingsForm() {
   settingsForm.full_name = profile.value?.full_name || ''
+  settingsForm.login = profile.value?.login_email || ''
   settingsForm.phone = profile.value?.phone || ''
   settingsForm.telegram_username = profile.value?.telegram_username || ''
+  settingsForm.avatar_url = profile.value?.avatar_url || ''
   settingsForm.language = profile.value?.language || 'uz'
   settingsForm.performance_mode = profile.value?.performance_mode || 'balanced'
   settingsForm.password = ''
 }
 
-function resetTaskForm() {
+function resetTaskForm(task?: Task) {
   Object.assign(taskForm, {
-    title: '',
-    description: '',
-    assignee_id: assigneeOptions.value[0]?.id || '',
-    priority: 'medium',
-    status: 'todo',
-    due_date: todayIso.value,
-    checklistText: ''
+    title: task?.title || '',
+    description: task?.description || '',
+    assignee_id: task?.assignee_id || (isManager.value ? assigneeOptions.value[0]?.id || '' : profile.value?.id || ''),
+    priority: task?.priority || 'medium',
+    status: task?.status || 'todo',
+    due_date: task?.due_date || todayIso.value,
+    checklistText: task?.checklist?.map((item) => item.title).join('\n') || ''
   })
+  editingTaskId.value = task?.id || null
 }
 
 function resetEmployeeForm() {
@@ -757,11 +799,11 @@ async function handleLogout() {
 
 async function submitTask() {
   resetMessages()
-  if (!isManager.value) return
   if (!taskForm.title.trim()) {
     errorMessage.value = t('taskTitleRequired')
     return
   }
+  if (!isManager.value) taskForm.assignee_id = profile.value?.id || ''
   if (!taskForm.assignee_id) {
     errorMessage.value = t('assigneeRequired')
     return
@@ -769,7 +811,7 @@ async function submitTask() {
 
   saving.value = true
   try {
-    await createTask({
+    const payload = {
       title: taskForm.title.trim(),
       description: taskForm.description.trim(),
       assignee_id: taskForm.assignee_id,
@@ -777,9 +819,13 @@ async function submitTask() {
       status: taskForm.status,
       due_date: taskForm.due_date || null,
       checklist: taskForm.checklistText.split('\n')
-    })
+    }
+
+    if (editingTaskId.value) await updateTask(editingTaskId.value, payload)
+    else await createTask(payload)
+
     showTaskComposer.value = false
-    noticeMessage.value = t('taskSaved')
+    noticeMessage.value = editingTaskId.value ? t('taskUpdated') : t('taskSaved')
     resetTaskForm()
     await refreshData()
   } catch (error) {
@@ -787,6 +833,14 @@ async function submitTask() {
   } finally {
     saving.value = false
   }
+}
+
+function startEditTask(task: Task) {
+  resetMessages()
+  taskActionMenuId.value = null
+  activeView.value = 'tasks'
+  showTaskComposer.value = true
+  resetTaskForm(task)
 }
 
 async function submitEmployee() {
@@ -830,9 +884,24 @@ async function changeStatus(task: Task, status: PersistedTaskStatus) {
   }
 }
 
+async function cancelTask(task: Task) {
+  resetMessages()
+  taskActionMenuId.value = null
+  try {
+    const updatedTask = await updateTaskStatus(task, 'canceled')
+    tasks.value = tasks.value.map((currentTask) =>
+      currentTask.id === task.id ? { ...currentTask, ...updatedTask, checklist: currentTask.checklist } : currentTask
+    )
+    noticeMessage.value = t('taskCanceled')
+    await refreshData()
+  } catch (error) {
+    errorMessage.value = error instanceof Error ? error.message : t('cannotCancel')
+  }
+}
+
 async function removeTask(task: Task) {
   resetMessages()
-  if (!isManager.value) return
+  taskActionMenuId.value = null
 
   try {
     await deleteTask(task.id)
@@ -867,24 +936,45 @@ async function saveSettings() {
   saving.value = true
 
   try {
+    const nextLogin = normalizeLoginIdentifier(settingsForm.login || '')
+    const loginChanged = nextLogin && nextLogin !== profile.value?.login_email
+    if (loginChanged || settingsForm.password.trim()) {
+      await updateAccountCredentials({
+        login: loginChanged ? nextLogin : undefined,
+        password: settingsForm.password.trim() || undefined
+      })
+    }
+
     profile.value = await upsertProfile({
       full_name: settingsForm.full_name.trim() || 'User',
+      login_email: nextLogin || profile.value?.login_email || '',
       phone: settingsForm.phone.trim(),
       telegram_username: normalizeTelegramUsername(settingsForm.telegram_username || ''),
+      avatar_url: settingsForm.avatar_url || null,
       language: settingsForm.language,
       performance_mode: settingsForm.performance_mode
     })
 
-    if (settingsForm.password.trim()) await updatePassword(settingsForm.password.trim())
-
     fillSettingsForm()
-    noticeMessage.value = t('profileSaved')
+    noticeMessage.value = loginChanged ? t('loginUpdated') : t('profileSaved')
     await refreshData()
   } catch (error) {
     errorMessage.value = error instanceof Error ? error.message : t('profileSaveError')
   } finally {
     saving.value = false
   }
+}
+
+function handleAvatarFile(event: Event) {
+  const input = event.target as HTMLInputElement
+  const file = input.files?.[0]
+  if (!file) return
+  const reader = new FileReader()
+  reader.onload = () => {
+    settingsForm.avatar_url = String(reader.result || '')
+  }
+  reader.readAsDataURL(file)
+  input.value = ''
 }
 
 onMounted(initializeAuth)
@@ -989,7 +1079,10 @@ watch(errorMessage, (message) => {
         </nav>
 
         <div class="sidebar-profile">
-          <div class="avatar">{{ getInitials(profile?.full_name) }}</div>
+          <div class="avatar">
+            <img v-if="profile?.avatar_url" :src="profile.avatar_url" alt="" />
+            <span v-else>{{ getInitials(profile?.full_name) }}</span>
+          </div>
           <div>
             <strong>{{ profile?.full_name || 'User' }}</strong>
             <span>{{ roleLabel(profile?.role) }}</span>
@@ -1016,7 +1109,10 @@ watch(errorMessage, (message) => {
           </div>
           <div class="topbar-actions">
             <button class="profile-trigger" :aria-label="t('openProfileMenu')" @click="profileMenuOpen = !profileMenuOpen">
-              <span class="avatar small">{{ getInitials(profile?.full_name) }}</span>
+              <span class="avatar small">
+                <img v-if="profile?.avatar_url" :src="profile.avatar_url" alt="" />
+                <span v-else>{{ getInitials(profile?.full_name) }}</span>
+              </span>
               <i class="bi bi-chevron-down"></i>
             </button>
             <Transition name="fade">
@@ -1025,7 +1121,10 @@ watch(errorMessage, (message) => {
             <Transition name="panel-pop">
               <div v-if="profileMenuOpen" class="profile-menu">
                 <div class="profile-menu-head">
-                  <div class="avatar">{{ getInitials(profile?.full_name) }}</div>
+                  <div class="avatar">
+                    <img v-if="profile?.avatar_url" :src="profile.avatar_url" alt="" />
+                    <span v-else>{{ getInitials(profile?.full_name) }}</span>
+                  </div>
                   <div>
                     <strong>{{ profile?.full_name || 'User' }}</strong>
                     <span>{{ roleLabel(profile?.role) }}</span>
@@ -1112,9 +1211,9 @@ watch(errorMessage, (message) => {
 
           <section v-else-if="activeView === 'tasks'" key="tasks" class="view-stack">
             <Transition name="panel-pop">
-              <form v-if="isManager && showTaskComposer" class="panel form-panel" @submit.prevent="submitTask">
+              <form v-if="showTaskComposer" class="panel form-panel" @submit.prevent="submitTask">
               <div class="section-header">
-                <h2>{{ t('newTask') }}</h2>
+                <h2>{{ editingTaskId ? t('editTask') : t('newTask') }}</h2>
                 <button type="button" class="ghost-button icon-only" @click="showTaskComposer = false" :aria-label="t('close')">
                   <i class="bi bi-x-lg"></i>
                 </button>
@@ -1125,7 +1224,7 @@ watch(errorMessage, (message) => {
                   {{ t('title') }}
                   <input v-model="taskForm.title" :placeholder="t('taskTitlePlaceholder')" />
                 </label>
-                <label>
+                <label v-if="isManager">
                   {{ t('assignee') }}
                   <select v-model="taskForm.assignee_id">
                     <option value="">—</option>
@@ -1161,7 +1260,7 @@ watch(errorMessage, (message) => {
 
               <button class="primary-button fit" :disabled="saving">
                 <i class="bi bi-save"></i>
-                {{ saving ? '...' : t('saveTask') }}
+                {{ saving ? '...' : editingTaskId ? t('editTask') : t('saveTask') }}
               </button>
               </form>
             </Transition>
@@ -1179,6 +1278,7 @@ watch(errorMessage, (message) => {
                 <option value="todo">{{ t('todo') }}</option>
                 <option value="in_progress">{{ t('in_progress') }}</option>
                 <option value="completed">{{ t('completed') }}</option>
+                <option value="canceled">{{ t('canceled') }}</option>
                 <option value="overdue">{{ t('overdue') }}</option>
               </select>
             </div>
@@ -1187,7 +1287,7 @@ watch(errorMessage, (message) => {
               <section class="panel">
                 <div class="section-header">
                   <h2>{{ t('tasks') }}</h2>
-                  <button v-if="isManager" class="link-button" @click="showTaskComposer = true; resetTaskForm()">
+                  <button class="link-button" @click="showTaskComposer = true; resetTaskForm()">
                     <i class="bi bi-plus-lg"></i>
                     {{ t('newTask') }}
                   </button>
@@ -1213,9 +1313,14 @@ watch(errorMessage, (message) => {
                     </div>
                     <span :class="['status-pill', taskDisplayStatus(task)]">{{ statusLabel(taskDisplayStatus(task)) }}</span>
                     <span class="muted-text">{{ formatDate(task.due_date) }}</span>
-                    <button v-if="isManager" class="ghost-button icon-only danger" @click.stop="removeTask(task)" :aria-label="t('delete')">
-                      <i class="bi bi-trash3"></i>
+                    <button class="ghost-button icon-only" @click.stop="taskActionMenuId = taskActionMenuId === task.id ? null : task.id" :aria-label="t('actions')">
+                      <i class="bi bi-three-dots"></i>
                     </button>
+                    <div v-if="taskActionMenuId === task.id" class="task-actions-menu" @click.stop>
+                      <button @click="startEditTask(task)"><i class="bi bi-pencil"></i>{{ t('editTask') }}</button>
+                      <button @click="cancelTask(task)"><i class="bi bi-x-circle"></i>{{ t('cancelTask') }}</button>
+                      <button class="danger-text" @click="removeTask(task)"><i class="bi bi-trash3"></i>{{ t('delete') }}</button>
+                    </div>
                   </article>
                 </div>
               </section>
@@ -1248,6 +1353,7 @@ watch(errorMessage, (message) => {
                     <button class="ghost-button" @click="changeStatus(selectedTask, 'todo')">{{ t('todo') }}</button>
                     <button class="ghost-button" @click="changeStatus(selectedTask, 'in_progress')">{{ t('in_progress') }}</button>
                     <button class="primary-button fit" @click="changeStatus(selectedTask, 'completed')">{{ t('completed') }}</button>
+                    <button class="ghost-button danger-text" @click="cancelTask(selectedTask)">{{ t('cancelTask') }}</button>
                   </div>
 
                   <div v-if="selectedTask.checklist?.length" class="checklist-list">
@@ -1338,7 +1444,10 @@ watch(errorMessage, (message) => {
               <div v-else class="employee-table">
                 <article v-for="employee in employees" :key="employee.id" class="employee-row">
                   <div class="employee-identity">
-                    <div class="avatar small">{{ getInitials(employee.full_name) }}</div>
+                    <div class="avatar small">
+                      <img v-if="employee.avatar_url" :src="employee.avatar_url" alt="" />
+                      <span v-else>{{ getInitials(employee.full_name) }}</span>
+                    </div>
                     <div>
                       <strong>{{ employee.full_name || employee.login_email || '—' }}</strong>
                       <span><i class="bi bi-person"></i>{{ employee.login_email || '—' }}</span>
@@ -1423,10 +1532,34 @@ watch(errorMessage, (message) => {
                     <p>{{ t('settingsDescription') }}</p>
                   </div>
                 </div>
+                <div class="avatar-uploader">
+                  <div class="avatar large">
+                    <img v-if="settingsForm.avatar_url" :src="settingsForm.avatar_url" alt="" />
+                    <span v-else>{{ getInitials(settingsForm.full_name) }}</span>
+                  </div>
+                  <div>
+                    <strong>{{ t('profileImage') }}</strong>
+                    <div class="avatar-actions">
+                      <label class="ghost-button fit">
+                        <i class="bi bi-image"></i>
+                        {{ t('changeImage') }}
+                        <input type="file" accept="image/*" @change="handleAvatarFile" />
+                      </label>
+                      <button type="button" class="ghost-button fit" @click="settingsForm.avatar_url = ''">
+                        <i class="bi bi-x-circle"></i>
+                        {{ t('removeImage') }}
+                      </button>
+                    </div>
+                  </div>
+                </div>
                 <div class="form-grid">
                   <label>
                     {{ t('fullName') }}
                     <input v-model="settingsForm.full_name" />
+                  </label>
+                  <label>
+                    {{ t('email') }}
+                    <input v-model="settingsForm.login" autocomplete="username" />
                   </label>
                   <label>
                     {{ t('phone') }}
@@ -1504,7 +1637,10 @@ watch(errorMessage, (message) => {
 
               <section id="settings-account" class="panel settings-card account-card">
                 <div class="profile-heading">
-                  <div class="avatar large">{{ getInitials(profile?.full_name) }}</div>
+                  <div class="avatar large">
+                    <img v-if="profile?.avatar_url" :src="profile.avatar_url" alt="" />
+                    <span v-else>{{ getInitials(profile?.full_name) }}</span>
+                  </div>
                   <div>
                     <h2>{{ profile?.full_name || 'User' }}</h2>
                     <p><i class="bi bi-person-badge"></i>{{ roleLabel(profile?.role) }}</p>

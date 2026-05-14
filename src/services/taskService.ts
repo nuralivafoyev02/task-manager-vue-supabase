@@ -72,6 +72,21 @@ export async function updatePassword(password: string) {
   if (error) throw error
 }
 
+export async function updateAccountCredentials(payload: { login?: string; password?: string }) {
+  const token = await getAccessToken()
+  const response = await fetch('/api/profile', {
+    method: 'PATCH',
+    headers: {
+      'Content-Type': 'application/json',
+      Authorization: `Bearer ${token}`
+    },
+    body: JSON.stringify(payload)
+  })
+
+  if (!response.ok) throw new Error(await readApiError(response))
+  return response.json()
+}
+
 export async function loadProfile() {
   const user = await getCurrentUser()
   if (!user) return null
@@ -98,8 +113,10 @@ export async function loadProfiles(): Promise<Profile[]> {
 
 export async function upsertProfile(payload: {
   full_name: string
+  login_email?: string
   phone?: string
   telegram_username?: string
+  avatar_url?: string | null
   language: AppLanguage
   performance_mode: PerformanceMode
 }) {
@@ -112,9 +129,10 @@ export async function upsertProfile(payload: {
       {
         id: user.id,
         full_name: payload.full_name,
-        login_email: user.email || null,
+        login_email: payload.login_email || user.email || null,
         phone: payload.phone || null,
         telegram_username: payload.telegram_username ? normalizeTelegramUsername(payload.telegram_username) : null,
+        avatar_url: payload.avatar_url || null,
         language: payload.language,
         performance_mode: payload.performance_mode
       },
@@ -272,6 +290,52 @@ export async function createTask(payload: {
   })
 
   return task as Task
+}
+
+export async function updateTask(
+  taskId: string,
+  payload: {
+    title: string
+    description?: string
+    assignee_id?: string | null
+    project_id?: string | null
+    priority: TaskPriority
+    status: PersistedTaskStatus
+    due_date?: string | null
+    checklist?: string[]
+  }
+) {
+  const { data, error } = await supabase
+    .from('tasks')
+    .update({
+      assignee_id: payload.assignee_id || null,
+      title: payload.title,
+      description: payload.description || null,
+      project_id: payload.project_id || null,
+      priority: payload.priority,
+      status: payload.status,
+      due_date: payload.due_date || null,
+      completed_at: payload.status === 'completed' ? new Date().toISOString() : null
+    })
+    .eq('id', taskId)
+    .select(taskSelect)
+    .single()
+
+  if (error) throw error
+
+  const cleanChecklist = (payload.checklist || []).map((title) => title.trim()).filter(Boolean)
+  const { error: deleteChecklistError } = await supabase.from('task_checklist_items').delete().eq('task_id', taskId)
+  if (deleteChecklistError) throw deleteChecklistError
+
+  if (cleanChecklist.length) {
+    const { error: checklistError } = await supabase.from('task_checklist_items').insert(
+      cleanChecklist.map((title, index) => ({ task_id: taskId, title, sort_order: index + 1 }))
+    )
+    if (checklistError) throw checklistError
+  }
+
+  await addActivity(taskId, 'task.updated', `Task updated: ${payload.title}`)
+  return data as Task
 }
 
 export async function updateTaskStatus(task: Task, status: PersistedTaskStatus) {

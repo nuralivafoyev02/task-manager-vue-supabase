@@ -875,6 +875,7 @@ button:disabled {
 }
 
 .task-row {
+  position: relative;
   display: grid;
   grid-template-columns: 30px minmax(160px, 1fr) 138px 128px 40px;
   align-items: center;
@@ -882,6 +883,43 @@ button:disabled {
   min-height: 62px;
   padding: 12px 18px;
   border-bottom: 1px solid var(--line);
+}
+
+.task-actions-menu {
+  position: absolute;
+  right: 16px;
+  top: 48px;
+  z-index: 40;
+  min-width: 180px;
+  display: grid;
+  gap: 4px;
+  padding: 8px;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: var(--surface);
+  box-shadow: 0 18px 44px var(--shadow);
+}
+
+.task-actions-menu button {
+  min-height: 36px;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 0 10px;
+  border: 0;
+  border-radius: 8px;
+  background: transparent;
+  color: var(--text);
+  font-weight: 800;
+  text-align: left;
+}
+
+.task-actions-menu button:hover {
+  background: var(--surface-soft);
+}
+
+.danger-text {
+  color: var(--danger) !important;
 }
 
 .task-row:last-child,
@@ -944,6 +982,11 @@ button:disabled {
   background: var(--success);
 }
 
+.status-dot.canceled {
+  border-color: #94a3b8;
+  background: #e2e8f0;
+}
+
 .status-dot.overdue {
   border-color: var(--danger);
   background: var(--danger-soft);
@@ -977,6 +1020,11 @@ button:disabled {
 .status-pill.completed {
   background: var(--success-soft);
   color: var(--success);
+}
+
+.status-pill.canceled {
+  background: #f1f5f9;
+  color: #64748b;
 }
 
 .status-pill.overdue {
@@ -1221,6 +1269,7 @@ textarea:focus {
 }
 
 .avatar {
+  overflow: hidden;
   width: 40px;
   height: 40px;
   display: grid;
@@ -1231,6 +1280,12 @@ textarea:focus {
   color: var(--blue);
   font-size: 13px;
   font-weight: 900;
+}
+
+.avatar img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
 }
 
 .avatar.small {
@@ -1250,6 +1305,33 @@ textarea:focus {
   width: 72px;
   height: 72px;
   font-size: 22px;
+}
+
+.avatar-uploader {
+  display: grid;
+  grid-template-columns: 72px minmax(0, 1fr);
+  align-items: center;
+  gap: 14px;
+  padding: 12px;
+  border: 1px dashed var(--line-strong);
+  border-radius: 8px;
+  background: var(--surface-soft);
+}
+
+.avatar-uploader strong {
+  display: block;
+  margin-bottom: 10px;
+  font-size: 15px;
+}
+
+.avatar-actions {
+  display: flex;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+.avatar-actions input {
+  display: none;
 }
 
 .weekday-row {
