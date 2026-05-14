@@ -185,12 +185,14 @@ const copy: Record<AppLanguage, Record<string, string>> = {
 
 const activeView = ref<ViewKey>('dashboard')
 const loading = ref(true)
+const backgroundRefreshing = ref(false)
 const saving = ref(false)
 const errorMessage = ref('')
 const noticeMessage = ref('')
 const mobileMenuOpen = ref(false)
 const sessionReady = ref(false)
 const isAuthenticated = ref(false)
+let refreshPromise: Promise<void> | null = null
 
 const profile = ref<Profile | null>(null)
 const employees = ref<Profile[]>([])
@@ -462,29 +464,41 @@ function resetEmployeeForm() {
   })
 }
 
-async function refreshData() {
-  loading.value = true
-  resetMessages()
+async function refreshData(options: { showLoader?: boolean; clearMessages?: boolean } = {}) {
+  if (refreshPromise) return refreshPromise
 
-  try {
-    profile.value = await loadProfile()
-    fillSettingsForm()
+  const showLoader = options.showLoader ?? false
+  const clearMessages = options.clearMessages ?? false
 
-    if (profile.value) {
-      employees.value = await loadProfiles()
-      tasks.value = await loadTasks()
-      activity.value = await loadActivity()
-      selectedTaskId.value = selectedTask.value?.id || null
+  refreshPromise = (async () => {
+    if (showLoader) loading.value = true
+    else backgroundRefreshing.value = true
+    if (clearMessages) resetMessages()
 
-      if (!isManager.value && activeView.value !== 'tasks' && activeView.value !== 'calendar' && activeView.value !== 'settings') {
-        activeView.value = 'tasks'
+    try {
+      profile.value = await loadProfile()
+      fillSettingsForm()
+
+      if (profile.value) {
+        employees.value = await loadProfiles()
+        tasks.value = await loadTasks()
+        activity.value = await loadActivity()
+        selectedTaskId.value = selectedTask.value?.id || null
+
+        if (!isManager.value && activeView.value !== 'tasks' && activeView.value !== 'calendar' && activeView.value !== 'settings') {
+          activeView.value = 'tasks'
+        }
       }
+    } catch (error) {
+      errorMessage.value = error instanceof Error ? error.message : 'Data loading failed'
+    } finally {
+      if (showLoader) loading.value = false
+      backgroundRefreshing.value = false
+      refreshPromise = null
     }
-  } catch (error) {
-    errorMessage.value = error instanceof Error ? error.message : 'Data loading failed'
-  } finally {
-    loading.value = false
-  }
+  })()
+
+  return refreshPromise
 }
 
 async function initializeAuth() {
@@ -500,10 +514,11 @@ async function initializeAuth() {
 
   supabase.auth.onAuthStateChange((_event, session) => {
     isAuthenticated.value = Boolean(session)
-    if (session) refreshData()
+    if (session) refreshData({ showLoader: !profile.value })
+    else loading.value = false
   })
 
-  if (data.session) await refreshData()
+  if (data.session) await refreshData({ showLoader: true })
   else loading.value = false
 }
 
@@ -517,7 +532,6 @@ async function handleLogin() {
   saving.value = true
   try {
     await signInWithPassword(authForm.email.trim().toLowerCase(), authForm.password)
-    await refreshData()
   } catch (error) {
     errorMessage.value = error instanceof Error ? error.message : 'Login failed'
   } finally {
@@ -558,8 +572,8 @@ async function submitTask() {
     })
     showTaskComposer.value = false
     noticeMessage.value = 'Vazifa saqlandi.'
-    await refreshData()
     resetTaskForm()
+    await refreshData()
   } catch (error) {
     errorMessage.value = error instanceof Error ? error.message : 'Vazifa yaratishda xatolik.'
   } finally {
@@ -598,7 +612,10 @@ async function submitEmployee() {
 async function changeStatus(task: Task, status: PersistedTaskStatus) {
   resetMessages()
   try {
-    await updateTaskStatus(task, status)
+    const updatedTask = await updateTaskStatus(task, status)
+    tasks.value = tasks.value.map((currentTask) =>
+      currentTask.id === task.id ? { ...currentTask, ...updatedTask, checklist: currentTask.checklist } : currentTask
+    )
     await refreshData()
   } catch (error) {
     errorMessage.value = error instanceof Error ? error.message : 'Status o‘zgarmadi.'
@@ -611,6 +628,7 @@ async function removeTask(task: Task) {
 
   try {
     await deleteTask(task.id)
+    tasks.value = tasks.value.filter((currentTask) => currentTask.id !== task.id)
     await refreshData()
     noticeMessage.value = 'Vazifa o‘chirildi.'
   } catch (error) {
@@ -621,6 +639,10 @@ async function removeTask(task: Task) {
 async function toggleChecklist(itemId: string, checked: boolean) {
   try {
     await updateChecklistItem(itemId, checked)
+    tasks.value = tasks.value.map((task) => ({
+      ...task,
+      checklist: task.checklist?.map((item) => (item.id === itemId ? { ...item, is_done: checked } : item)) || []
+    }))
     await refreshData()
   } catch (error) {
     errorMessage.value = error instanceof Error ? error.message : 'Checklist yangilanmadi.'
@@ -728,7 +750,14 @@ onMounted(initializeAuth)
             <button v-if="isManager" class="primary-button" @click="activeView = 'tasks'; showTaskComposer = true; resetTaskForm()">
               + {{ t('newTask') }}
             </button>
-            <button class="ghost-button icon-only" @click="refreshData" :title="t('refresh')">↻</button>
+            <button
+              class="ghost-button icon-only"
+              :disabled="backgroundRefreshing"
+              @click="refreshData({ clearMessages: true })"
+              :title="t('refresh')"
+            >
+              ↻
+            </button>
           </div>
         </header>
 

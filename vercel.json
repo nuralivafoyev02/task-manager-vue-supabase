@@ -6,19 +6,7 @@
   "installCommand": "npm install",
   "rewrites": [
     {
-      "source": "/api/employee",
-      "destination": "/api/employees"
-    },
-    {
-      "source": "/api/notify-task",
-      "destination": "/api/notify-task"
-    },
-    {
-      "source": "/api/telegram-webhook",
-      "destination": "/api/telegram-webhook"
-    },
-    {
-      "source": "/(.*)",
+      "source": "/((?!api/.*).*)",
       "destination": "/index.html"
     }
   ]
