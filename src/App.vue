@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { computed, onMounted, reactive, ref } from 'vue'
+import { computed, onMounted, reactive, ref, watch } from 'vue'
 import { isSupabaseConfigured, supabase } from './lib/supabase'
 import {
   createEmployee,
@@ -33,6 +33,13 @@ import type {
 
 type ViewKey = 'dashboard' | 'tasks' | 'employees' | 'calendar' | 'settings'
 type StatusFilter = 'all' | PersistedTaskStatus | 'overdue'
+type ThemeMode = 'light' | 'dark'
+type ToastType = 'success' | 'error' | 'info'
+type ToastItem = { id: number; type: ToastType; message: string; startX?: number }
+
+const viewKeys: ViewKey[] = ['dashboard', 'tasks', 'employees', 'calendar', 'settings']
+const savedView = localStorage.getItem('task-manager-active-view') as ViewKey | null
+const savedTheme = localStorage.getItem('task-manager-theme') as ThemeMode | null
 
 const copy: Record<AppLanguage, Record<string, string>> = {
   uz: {
@@ -82,7 +89,60 @@ const copy: Record<AppLanguage, Record<string, string>> = {
     high: 'Yuqori',
     noTasks: 'Vazifa topilmadi',
     noEmployees: 'Xodim topilmadi',
-    calendarEmpty: 'Bu kunda vazifa yo‘q'
+    calendarEmpty: 'Bu kunda vazifa yo‘q',
+    dashboardDescription: 'Xodimlarga biriktirilgan vazifalar holati.',
+    tasksDescriptionManager: 'Vazifalarni qidirish, filtrlash va boshqarish.',
+    tasksDescriptionEmployee: 'Sizga biriktirilgan vazifalar.',
+    employeesDescription: 'Login, rol, telefon va Telegram ma’lumotlari.',
+    calendarDescription: 'Kunlar bo‘yicha biriktirilgan vazifalar.',
+    settingsDescription: 'Profil, xavfsizlik va interfeys sozlamalari.',
+    profile: 'Profil',
+    appearance: 'Ko‘rinish',
+    security: 'Xavfsizlik',
+    account: 'Akkaunt',
+    theme: 'Tema',
+    light: 'Light',
+    dark: 'Dark',
+    openProfileMenu: 'Profil menyusi',
+    menu: 'Menu',
+    checklistHelp: 'Har bir bandni yangi qatordan yozing. Masalan: briefni tekshirish, hisobotni yuborish.',
+    checklistPlaceholder: 'Briefni tekshirish\nHisobotni yuborish\nNatijani tasdiqlash',
+    all: 'Hammasi',
+    loading: 'Yuklanmoqda...',
+    notFoundTitle: 'Sahifa topilmadi',
+    notFoundText: 'Bu manzil mavjud emas yoki foydalanuvchi sahifasi sifatida ochilmaydi.',
+    home: 'Bosh sahifa',
+    supabaseMissingTitle: 'Supabase sozlanmagan',
+    supabaseMissingText: '.env faylga VITE_SUPABASE_URL va VITE_SUPABASE_ANON_KEY qiymatlarini kiriting.',
+    loginRequired: 'Login va parolni kiriting.',
+    taskTitleRequired: 'Vazifa nomini kiriting.',
+    assigneeRequired: 'Xodimni tanlang.',
+    taskSaved: 'Vazifa saqlandi.',
+    taskCreateError: 'Vazifa yaratishda xatolik.',
+    employeeValidation: 'Ism, login va kamida 6 belgili parol kiriting.',
+    employeeCreated: 'Xodim yaratildi.',
+    employeeCreateError: 'Xodim yaratishda xatolik.',
+    statusError: 'Status o‘zgarmadi.',
+    taskDeleted: 'Vazifa o‘chirildi.',
+    taskDeleteError: 'Vazifa o‘chirishda xatolik.',
+    checklistError: 'Checklist yangilanmadi.',
+    passwordValidation: 'Yangi parol kamida 6 belgidan iborat bo‘lishi kerak.',
+    profileSaved: 'Profil saqlandi.',
+    profileSaveError: 'Profil saqlanmadi.',
+    dataLoadError: 'Data loading failed',
+    loginFailed: 'Login failed',
+    close: 'Yopish',
+    closeMenu: 'Menyuni yopish',
+    delete: 'O‘chirish',
+    previousMonth: 'Oldingi oy',
+    nextMonth: 'Keyingi oy',
+    taskTitlePlaceholder: 'CRM hisobotini tayyorlash',
+    fullNamePlaceholder: 'Ali Valiyev',
+    passwordMinPlaceholder: 'Kamida 6 belgi',
+    newPasswordPlaceholder: 'Yangi parol',
+    showPassword: 'Parolni ko‘rsatish',
+    hidePassword: 'Parolni yashirish',
+    weekdays: 'Du,Se,Ch,Pa,Ju,Sh,Ya'
   },
   ru: {
     appName: 'Task Manager',
@@ -131,7 +191,60 @@ const copy: Record<AppLanguage, Record<string, string>> = {
     high: 'Высокий',
     noTasks: 'Задачи не найдены',
     noEmployees: 'Сотрудники не найдены',
-    calendarEmpty: 'На этот день задач нет'
+    calendarEmpty: 'На этот день задач нет',
+    dashboardDescription: 'Состояние задач, назначенных сотрудникам.',
+    tasksDescriptionManager: 'Поиск, фильтрация и управление задачами.',
+    tasksDescriptionEmployee: 'Задачи, назначенные вам.',
+    employeesDescription: 'Логин, роль, телефон и Telegram.',
+    calendarDescription: 'Задачи по датам.',
+    settingsDescription: 'Профиль, безопасность и интерфейс.',
+    profile: 'Профиль',
+    appearance: 'Внешний вид',
+    security: 'Безопасность',
+    account: 'Аккаунт',
+    theme: 'Тема',
+    light: 'Светлая',
+    dark: 'Темная',
+    openProfileMenu: 'Меню профиля',
+    menu: 'Меню',
+    checklistHelp: 'Пишите каждый пункт с новой строки. Например: проверить бриф, отправить отчет.',
+    checklistPlaceholder: 'Проверить бриф\nОтправить отчет\nПодтвердить результат',
+    all: 'Все',
+    loading: 'Загрузка...',
+    notFoundTitle: 'Страница не найдена',
+    notFoundText: 'Этот адрес не существует или не является страницей приложения.',
+    home: 'На главную',
+    supabaseMissingTitle: 'Supabase не настроен',
+    supabaseMissingText: 'Добавьте VITE_SUPABASE_URL и VITE_SUPABASE_ANON_KEY в .env файл.',
+    loginRequired: 'Введите логин и пароль.',
+    taskTitleRequired: 'Введите название задачи.',
+    assigneeRequired: 'Выберите сотрудника.',
+    taskSaved: 'Задача сохранена.',
+    taskCreateError: 'Ошибка при создании задачи.',
+    employeeValidation: 'Введите имя, логин и пароль минимум из 6 символов.',
+    employeeCreated: 'Сотрудник создан.',
+    employeeCreateError: 'Ошибка при создании сотрудника.',
+    statusError: 'Статус не изменен.',
+    taskDeleted: 'Задача удалена.',
+    taskDeleteError: 'Ошибка при удалении задачи.',
+    checklistError: 'Checklist не обновлен.',
+    passwordValidation: 'Новый пароль должен быть минимум 6 символов.',
+    profileSaved: 'Профиль сохранен.',
+    profileSaveError: 'Профиль не сохранен.',
+    dataLoadError: 'Ошибка загрузки данных',
+    loginFailed: 'Ошибка входа',
+    close: 'Закрыть',
+    closeMenu: 'Закрыть меню',
+    delete: 'Удалить',
+    previousMonth: 'Предыдущий месяц',
+    nextMonth: 'Следующий месяц',
+    taskTitlePlaceholder: 'Подготовить CRM отчет',
+    fullNamePlaceholder: 'Али Валиев',
+    passwordMinPlaceholder: 'Минимум 6 символов',
+    newPasswordPlaceholder: 'Новый пароль',
+    showPassword: 'Показать пароль',
+    hidePassword: 'Скрыть пароль',
+    weekdays: 'Пн,Вт,Ср,Чт,Пт,Сб,Вс'
   },
   uz_cyrl: {
     appName: 'Task Manager',
@@ -180,11 +293,64 @@ const copy: Record<AppLanguage, Record<string, string>> = {
     high: 'Юқори',
     noTasks: 'Вазифа топилмади',
     noEmployees: 'Ходим топилмади',
-    calendarEmpty: 'Бу кунда вазифа йўқ'
+    calendarEmpty: 'Бу кунда вазифа йўқ',
+    dashboardDescription: 'Ходимларга бириктирилган вазифалар ҳолати.',
+    tasksDescriptionManager: 'Вазифаларни қидириш, фильтрлаш ва бошқариш.',
+    tasksDescriptionEmployee: 'Сизга бириктирилган вазифалар.',
+    employeesDescription: 'Логин, рол, телефон ва Telegram маълумотлари.',
+    calendarDescription: 'Кунлар бўйича бириктирилган вазифалар.',
+    settingsDescription: 'Профил, хавфсизлик ва интерфейс созламалари.',
+    profile: 'Профил',
+    appearance: 'Кўриниш',
+    security: 'Хавфсизлик',
+    account: 'Аккаунт',
+    theme: 'Тема',
+    light: 'Light',
+    dark: 'Dark',
+    openProfileMenu: 'Профил менюси',
+    menu: 'Меню',
+    checklistHelp: 'Ҳар бир бандни янги қатордан ёзинг. Масалан: briefни текшириш, ҳисоботни юбориш.',
+    checklistPlaceholder: 'Briefни текшириш\nҲисоботни юбориш\nНатижани тасдиқлаш',
+    all: 'Ҳаммаси',
+    loading: 'Юкланмоқда...',
+    notFoundTitle: 'Саҳифа топилмади',
+    notFoundText: 'Бу манзил мавжуд эмас ёки фойдаланувчи саҳифаси сифатида очилмайди.',
+    home: 'Бош саҳифа',
+    supabaseMissingTitle: 'Supabase созланмаган',
+    supabaseMissingText: '.env файлга VITE_SUPABASE_URL ва VITE_SUPABASE_ANON_KEY қийматларини киритинг.',
+    loginRequired: 'Логин ва паролни киритинг.',
+    taskTitleRequired: 'Вазифа номини киритинг.',
+    assigneeRequired: 'Ходимни танланг.',
+    taskSaved: 'Вазифа сақланди.',
+    taskCreateError: 'Вазифа яратишда хатолик.',
+    employeeValidation: 'Исм, логин ва камида 6 белгили парол киритинг.',
+    employeeCreated: 'Ходим яратилди.',
+    employeeCreateError: 'Ходим яратишда хатолик.',
+    statusError: 'Статус ўзгармади.',
+    taskDeleted: 'Вазифа ўчирилди.',
+    taskDeleteError: 'Вазифа ўчиришда хатолик.',
+    checklistError: 'Checklist янгиланмади.',
+    passwordValidation: 'Янги парол камида 6 белгидан иборат бўлиши керак.',
+    profileSaved: 'Профил сақланди.',
+    profileSaveError: 'Профил сақланмади.',
+    dataLoadError: 'Data loading failed',
+    loginFailed: 'Login failed',
+    close: 'Ёпиш',
+    closeMenu: 'Менюни ёпиш',
+    delete: 'Ўчириш',
+    previousMonth: 'Олдинги ой',
+    nextMonth: 'Кейинги ой',
+    taskTitlePlaceholder: 'CRM ҳисоботини тайёрлаш',
+    fullNamePlaceholder: 'Али Валиев',
+    passwordMinPlaceholder: 'Камида 6 белги',
+    newPasswordPlaceholder: 'Янги парол',
+    showPassword: 'Паролни кўрсатиш',
+    hidePassword: 'Паролни яшириш',
+    weekdays: 'Ду,Се,Чо,Па,Жу,Ша,Як'
   }
 }
 
-const activeView = ref<ViewKey>('dashboard')
+const activeView = ref<ViewKey>(savedView && viewKeys.includes(savedView) ? savedView : 'dashboard')
 const loading = ref(true)
 const backgroundRefreshing = ref(false)
 const saving = ref(false)
@@ -196,6 +362,10 @@ const isAuthenticated = ref(false)
 const employeePasswordVisible = ref(false)
 const settingsPasswordVisible = ref(false)
 const currentPath = ref(window.location.pathname)
+const profileMenuOpen = ref(false)
+const themeMode = ref<ThemeMode>(savedTheme === 'dark' ? 'dark' : 'light')
+const toasts = ref<ToastItem[]>([])
+let toastId = 0
 let refreshPromise: Promise<void> | null = null
 
 const profile = ref<Profile | null>(null)
@@ -279,13 +449,14 @@ const filteredTasks = computed(() => {
   let list = [...tasks.value]
 
   if (query) {
+    const terms = query.split(/\s+/).filter(Boolean)
     list = list.filter((task) => {
       const assignee = task.assignee?.full_name || employeeMap.value.get(task.assignee_id || '')?.full_name || ''
-      return [task.title, task.description, assignee]
+      const haystack = [task.title, task.description, assignee, task.priority, task.status, formatDate(task.due_date)]
         .filter(Boolean)
         .join(' ')
         .toLowerCase()
-        .includes(query)
+      return terms.every((term) => haystack.includes(term))
     })
   }
 
@@ -309,11 +480,11 @@ const pageTitle = computed(() => {
 })
 
 const pageDescription = computed(() => {
-  if (activeView.value === 'employees') return 'Login, rol, telefon va Telegram ma’lumotlari.'
-  if (activeView.value === 'calendar') return 'Kunlar bo‘yicha biriktirilgan vazifalar.'
-  if (activeView.value === 'settings') return 'Profil, til va ishlash rejimi.'
-  if (isManager.value) return 'Xodimlarga biriktirilgan vazifalar holati.'
-  return 'Sizga biriktirilgan vazifalar.'
+  if (activeView.value === 'employees') return t('employeesDescription')
+  if (activeView.value === 'calendar') return t('calendarDescription')
+  if (activeView.value === 'settings') return t('settingsDescription')
+  if (activeView.value === 'tasks') return isManager.value ? t('tasksDescriptionManager') : t('tasksDescriptionEmployee')
+  return t('dashboardDescription')
 })
 
 const calendarTitle = computed(() => {
@@ -351,6 +522,7 @@ const calendarDays = computed(() => {
 })
 
 const selectedCalendarTasks = computed(() => tasks.value.filter((task) => task.due_date === selectedCalendarDate.value))
+const weekdayLabels = computed(() => t('weekdays').split(','))
 
 function t(key: string) {
   return copy[currentLanguage.value]?.[key] || copy.uz[key] || key
@@ -366,6 +538,30 @@ function toIsoDate(date: Date) {
 function resetMessages() {
   errorMessage.value = ''
   noticeMessage.value = ''
+}
+
+function showToast(type: ToastType, message: string) {
+  if (!message) return
+  const id = ++toastId
+  toasts.value.push({ id, type, message })
+  window.setTimeout(() => dismissToast(id), 4200)
+}
+
+function dismissToast(id: number) {
+  toasts.value = toasts.value.filter((toast) => toast.id !== id)
+}
+
+function startToastSwipe(toast: ToastItem, event: PointerEvent) {
+  toast.startX = event.clientX
+}
+
+function endToastSwipe(toast: ToastItem, event: PointerEvent) {
+  if (toast.startX !== undefined && Math.abs(event.clientX - toast.startX) > 40) dismissToast(toast.id)
+  toast.startX = undefined
+}
+
+function setTheme(mode: ThemeMode) {
+  themeMode.value = mode
 }
 
 function goHome() {
@@ -432,6 +628,7 @@ function displayTelegram(username?: string | null) {
 function selectView(key: ViewKey) {
   activeView.value = key
   mobileMenuOpen.value = false
+  profileMenuOpen.value = false
 }
 
 function previousMonth() {
@@ -501,7 +698,7 @@ async function refreshData(options: { showLoader?: boolean; clearMessages?: bool
         }
       }
     } catch (error) {
-      errorMessage.value = error instanceof Error ? error.message : 'Data loading failed'
+      errorMessage.value = error instanceof Error ? error.message : t('dataLoadError')
     } finally {
       if (showLoader) loading.value = false
       backgroundRefreshing.value = false
@@ -536,7 +733,7 @@ async function initializeAuth() {
 async function handleLogin() {
   resetMessages()
   if (normalizeLoginIdentifier(authForm.email).length < 1 || authForm.password.length < 1) {
-    errorMessage.value = 'Login va parolni kiriting.'
+    errorMessage.value = t('loginRequired')
     return
   }
 
@@ -544,7 +741,7 @@ async function handleLogin() {
   try {
     await signInWithPassword(authForm.email.trim().toLowerCase(), authForm.password)
   } catch (error) {
-    errorMessage.value = error instanceof Error ? error.message : 'Login failed'
+    errorMessage.value = error instanceof Error ? error.message : t('loginFailed')
   } finally {
     saving.value = false
   }
@@ -562,11 +759,11 @@ async function submitTask() {
   resetMessages()
   if (!isManager.value) return
   if (!taskForm.title.trim()) {
-    errorMessage.value = 'Vazifa nomini kiriting.'
+    errorMessage.value = t('taskTitleRequired')
     return
   }
   if (!taskForm.assignee_id) {
-    errorMessage.value = 'Xodimni tanlang.'
+    errorMessage.value = t('assigneeRequired')
     return
   }
 
@@ -582,11 +779,11 @@ async function submitTask() {
       checklist: taskForm.checklistText.split('\n')
     })
     showTaskComposer.value = false
-    noticeMessage.value = 'Vazifa saqlandi.'
+    noticeMessage.value = t('taskSaved')
     resetTaskForm()
     await refreshData()
   } catch (error) {
-    errorMessage.value = error instanceof Error ? error.message : 'Vazifa yaratishda xatolik.'
+    errorMessage.value = error instanceof Error ? error.message : t('taskCreateError')
   } finally {
     saving.value = false
   }
@@ -597,7 +794,7 @@ async function submitEmployee() {
   if (!isManager.value) return
 
   if (!employeeForm.full_name.trim() || normalizeLoginIdentifier(employeeForm.login_email).length < 3 || employeeForm.password.length < 6) {
-    errorMessage.value = 'Ism, login va kamida 6 belgili parol kiriting.'
+    errorMessage.value = t('employeeValidation')
     return
   }
 
@@ -609,12 +806,12 @@ async function submitEmployee() {
       login_email: normalizeLoginIdentifier(employeeForm.login_email),
       telegram_username: normalizeTelegramUsername(employeeForm.telegram_username || '')
     })
-    noticeMessage.value = 'Xodim yaratildi.'
+    noticeMessage.value = t('employeeCreated')
     showEmployeeComposer.value = false
     resetEmployeeForm()
     await refreshData()
   } catch (error) {
-    errorMessage.value = error instanceof Error ? error.message : 'Xodim yaratishda xatolik.'
+    errorMessage.value = error instanceof Error ? error.message : t('employeeCreateError')
   } finally {
     saving.value = false
   }
@@ -629,7 +826,7 @@ async function changeStatus(task: Task, status: PersistedTaskStatus) {
     )
     await refreshData()
   } catch (error) {
-    errorMessage.value = error instanceof Error ? error.message : 'Status o‘zgarmadi.'
+    errorMessage.value = error instanceof Error ? error.message : t('statusError')
   }
 }
 
@@ -641,9 +838,9 @@ async function removeTask(task: Task) {
     await deleteTask(task.id)
     tasks.value = tasks.value.filter((currentTask) => currentTask.id !== task.id)
     await refreshData()
-    noticeMessage.value = 'Vazifa o‘chirildi.'
+    noticeMessage.value = t('taskDeleted')
   } catch (error) {
-    errorMessage.value = error instanceof Error ? error.message : 'Vazifa o‘chirishda xatolik.'
+    errorMessage.value = error instanceof Error ? error.message : t('taskDeleteError')
   }
 }
 
@@ -656,14 +853,14 @@ async function toggleChecklist(itemId: string, checked: boolean) {
     }))
     await refreshData()
   } catch (error) {
-    errorMessage.value = error instanceof Error ? error.message : 'Checklist yangilanmadi.'
+    errorMessage.value = error instanceof Error ? error.message : t('checklistError')
   }
 }
 
 async function saveSettings() {
   resetMessages()
   if (settingsForm.password.trim() && settingsForm.password.trim().length < 6) {
-    errorMessage.value = 'Yangi parol kamida 6 belgidan iborat bo‘lishi kerak.'
+    errorMessage.value = t('passwordValidation')
     return
   }
 
@@ -681,28 +878,61 @@ async function saveSettings() {
     if (settingsForm.password.trim()) await updatePassword(settingsForm.password.trim())
 
     fillSettingsForm()
-    noticeMessage.value = 'Profil saqlandi.'
+    noticeMessage.value = t('profileSaved')
     await refreshData()
   } catch (error) {
-    errorMessage.value = error instanceof Error ? error.message : 'Profil saqlanmadi.'
+    errorMessage.value = error instanceof Error ? error.message : t('profileSaveError')
   } finally {
     saving.value = false
   }
 }
 
 onMounted(initializeAuth)
+
+watch(activeView, (view) => {
+  localStorage.setItem('task-manager-active-view', view)
+})
+
+watch(themeMode, (mode) => {
+  localStorage.setItem('task-manager-theme', mode)
+})
+
+watch(noticeMessage, (message) => {
+  if (message) showToast('success', message)
+})
+
+watch(errorMessage, (message) => {
+  if (message) showToast('error', message)
+})
 </script>
 
 <template>
-  <main :class="['app-shell', settingsForm.performance_mode === 'compact' && 'performance-compact']">
+  <main :class="['app-shell', `theme-${themeMode}`, settingsForm.performance_mode === 'compact' && 'performance-compact']">
+    <div class="toast-stack" aria-live="polite">
+      <TransitionGroup name="toast">
+        <button
+          v-for="toast in toasts"
+          :key="toast.id"
+          :class="['toast-card', toast.type]"
+          @click="dismissToast(toast.id)"
+          @pointerdown="startToastSwipe(toast, $event)"
+          @pointerup="endToastSwipe(toast, $event)"
+        >
+          <i :class="['bi', toast.type === 'success' ? 'bi-check-circle' : toast.type === 'error' ? 'bi-exclamation-circle' : 'bi-info-circle']"></i>
+          <span>{{ toast.message }}</span>
+          <i class="bi bi-x-lg toast-close"></i>
+        </button>
+      </TransitionGroup>
+    </div>
+
     <section v-if="isNotFoundRoute" class="not-found-screen">
       <div class="not-found-panel">
         <span>404</span>
-        <h1>Sahifa topilmadi</h1>
-        <p>Bu manzil mavjud emas yoki foydalanuvchi sahifasi sifatida ochilmaydi.</p>
+        <h1>{{ t('notFoundTitle') }}</h1>
+        <p>{{ t('notFoundText') }}</p>
         <button class="primary-button fit" @click="goHome">
           <i class="bi bi-house-door"></i>
-          Bosh sahifa
+          {{ t('home') }}
         </button>
       </div>
     </section>
@@ -710,8 +940,8 @@ onMounted(initializeAuth)
     <section v-else-if="!isSupabaseConfigured" class="auth-screen">
       <div class="auth-panel">
         <div class="brand-mark"><i class="bi bi-check2"></i></div>
-        <h1>Supabase sozlanmagan</h1>
-        <p>.env faylga VITE_SUPABASE_URL va VITE_SUPABASE_ANON_KEY qiymatlarini kiriting.</p>
+        <h1>{{ t('supabaseMissingTitle') }}</h1>
+        <p>{{ t('supabaseMissingText') }}</p>
         <code>cp .env.example .env</code>
       </div>
     </section>
@@ -736,9 +966,6 @@ onMounted(initializeAuth)
           {{ saving ? '...' : t('signIn') }}
         </button>
 
-        <Transition name="message-slide">
-          <div v-if="errorMessage" class="message error">{{ errorMessage }}</div>
-        </Transition>
       </form>
     </section>
 
@@ -769,10 +996,18 @@ onMounted(initializeAuth)
           </div>
         </div>
       </aside>
+      <Transition name="fade">
+        <button
+          v-if="mobileMenuOpen"
+          class="sidebar-scrim"
+          :aria-label="t('closeMenu')"
+          @click="mobileMenuOpen = false"
+        ></button>
+      </Transition>
 
       <section class="workspace">
         <header class="topbar">
-          <button class="menu-button" @click="mobileMenuOpen = !mobileMenuOpen" aria-label="Menu">
+          <button class="menu-button" @click="mobileMenuOpen = !mobileMenuOpen" :aria-label="t('menu')">
             <i class="bi bi-list"></i>
           </button>
           <div>
@@ -780,29 +1015,47 @@ onMounted(initializeAuth)
             <p>{{ pageDescription }}</p>
           </div>
           <div class="topbar-actions">
-            <button v-if="isManager" class="primary-button" @click="activeView = 'tasks'; showTaskComposer = true; resetTaskForm()">
-              <i class="bi bi-plus-lg"></i>
-              {{ t('newTask') }}
+            <button class="profile-trigger" :aria-label="t('openProfileMenu')" @click="profileMenuOpen = !profileMenuOpen">
+              <span class="avatar small">{{ getInitials(profile?.full_name) }}</span>
+              <i class="bi bi-chevron-down"></i>
             </button>
-            <button
-              class="ghost-button icon-only"
-              :disabled="backgroundRefreshing"
-              @click="refreshData({ clearMessages: true })"
-              :title="t('refresh')"
-            >
-              <i :class="['bi', backgroundRefreshing ? 'bi-arrow-repeat spin' : 'bi-arrow-clockwise']"></i>
-            </button>
+            <Transition name="fade">
+              <button v-if="profileMenuOpen" class="profile-menu-scrim" :aria-label="t('close')" @click="profileMenuOpen = false"></button>
+            </Transition>
+            <Transition name="panel-pop">
+              <div v-if="profileMenuOpen" class="profile-menu">
+                <div class="profile-menu-head">
+                  <div class="avatar">{{ getInitials(profile?.full_name) }}</div>
+                  <div>
+                    <strong>{{ profile?.full_name || 'User' }}</strong>
+                    <span>{{ roleLabel(profile?.role) }}</span>
+                  </div>
+                </div>
+                <button @click="selectView('settings')">
+                  <i class="bi bi-gear"></i>
+                  {{ t('settings') }}
+                </button>
+                <button @click="selectView('settings')">
+                  <i class="bi bi-person"></i>
+                  {{ t('profile') }}
+                </button>
+                <div class="profile-menu-theme">
+                  <span>{{ t('theme') }}</span>
+                  <div>
+                    <button :class="{ active: themeMode === 'light' }" @click="setTheme('light')">{{ t('light') }}</button>
+                    <button :class="{ active: themeMode === 'dark' }" @click="setTheme('dark')">{{ t('dark') }}</button>
+                  </div>
+                </div>
+                <button class="danger-text" @click="profileMenuOpen = false; handleLogout()">
+                  <i class="bi bi-box-arrow-right"></i>
+                  {{ t('logout') }}
+                </button>
+              </div>
+            </Transition>
           </div>
         </header>
 
-        <Transition name="message-slide">
-          <div v-if="noticeMessage" class="message success">{{ noticeMessage }}</div>
-        </Transition>
-        <Transition name="message-slide">
-          <div v-if="errorMessage" class="message error">{{ errorMessage }}</div>
-        </Transition>
-
-        <section v-if="loading" class="empty-state">Loading...</section>
+        <section v-if="loading" class="empty-state">{{ t('loading') }}</section>
 
         <Transition v-else name="view-slide" mode="out-in">
           <section v-if="activeView === 'dashboard' && isManager" key="dashboard" class="view-stack">
@@ -862,7 +1115,7 @@ onMounted(initializeAuth)
               <form v-if="isManager && showTaskComposer" class="panel form-panel" @submit.prevent="submitTask">
               <div class="section-header">
                 <h2>{{ t('newTask') }}</h2>
-                <button type="button" class="ghost-button icon-only" @click="showTaskComposer = false" aria-label="Yopish">
+                <button type="button" class="ghost-button icon-only" @click="showTaskComposer = false" :aria-label="t('close')">
                   <i class="bi bi-x-lg"></i>
                 </button>
               </div>
@@ -870,7 +1123,7 @@ onMounted(initializeAuth)
               <div class="form-grid">
                 <label>
                   {{ t('title') }}
-                  <input v-model="taskForm.title" placeholder="CRM hisobotini tayyorlash" />
+                  <input v-model="taskForm.title" :placeholder="t('taskTitlePlaceholder')" />
                 </label>
                 <label>
                   {{ t('assignee') }}
@@ -902,7 +1155,8 @@ onMounted(initializeAuth)
 
               <label>
                 {{ t('checklist') }}
-                <textarea v-model="taskForm.checklistText" rows="3" placeholder="Har qator bitta item"></textarea>
+                <textarea v-model="taskForm.checklistText" rows="4" :placeholder="t('checklistPlaceholder')"></textarea>
+                <small class="field-help">{{ t('checklistHelp') }}</small>
               </label>
 
               <button class="primary-button fit" :disabled="saving">
@@ -916,9 +1170,12 @@ onMounted(initializeAuth)
               <div class="search-box">
                 <i class="bi bi-search"></i>
                 <input v-model="searchQuery" :placeholder="t('search')" />
+                <button v-if="searchQuery" type="button" :aria-label="t('close')" @click="searchQuery = ''">
+                  <i class="bi bi-x-lg"></i>
+                </button>
               </div>
               <select v-model="statusFilter" class="filter-select">
-                <option value="all">All</option>
+                <option value="all">{{ t('all') }}</option>
                 <option value="todo">{{ t('todo') }}</option>
                 <option value="in_progress">{{ t('in_progress') }}</option>
                 <option value="completed">{{ t('completed') }}</option>
@@ -956,7 +1213,7 @@ onMounted(initializeAuth)
                     </div>
                     <span :class="['status-pill', taskDisplayStatus(task)]">{{ statusLabel(taskDisplayStatus(task)) }}</span>
                     <span class="muted-text">{{ formatDate(task.due_date) }}</span>
-                    <button v-if="isManager" class="ghost-button icon-only danger" @click.stop="removeTask(task)" aria-label="O‘chirish">
+                    <button v-if="isManager" class="ghost-button icon-only danger" @click.stop="removeTask(task)" :aria-label="t('delete')">
                       <i class="bi bi-trash3"></i>
                     </button>
                   </article>
@@ -1008,10 +1265,10 @@ onMounted(initializeAuth)
 
           <section v-else-if="activeView === 'employees' && isManager" key="employees" class="view-stack">
             <Transition name="panel-pop">
-              <form v-if="showEmployeeComposer" class="panel form-panel" @submit.prevent="submitEmployee">
+              <form v-if="showEmployeeComposer" class="panel form-panel employee-form" @submit.prevent="submitEmployee">
               <div class="section-header">
                 <h2>{{ t('createEmployee') }}</h2>
-                <button type="button" class="ghost-button icon-only" @click="showEmployeeComposer = false" aria-label="Yopish">
+                <button type="button" class="ghost-button icon-only" @click="showEmployeeComposer = false" :aria-label="t('close')">
                   <i class="bi bi-x-lg"></i>
                 </button>
               </div>
@@ -1019,7 +1276,7 @@ onMounted(initializeAuth)
               <div class="form-grid">
                 <label>
                   {{ t('fullName') }}
-                  <input v-model="employeeForm.full_name" placeholder="Ali Valiyev" />
+                  <input v-model="employeeForm.full_name" :placeholder="t('fullNamePlaceholder')" />
                 </label>
                 <label>
                   {{ t('email') }}
@@ -1032,12 +1289,12 @@ onMounted(initializeAuth)
                       v-model="employeeForm.password"
                       :type="employeePasswordVisible ? 'text' : 'password'"
                       autocomplete="new-password"
-                      placeholder="Kamida 6 belgi"
+                      :placeholder="t('passwordMinPlaceholder')"
                     />
                     <button
                       type="button"
                       class="password-toggle"
-                      :aria-label="employeePasswordVisible ? 'Parolni yashirish' : 'Parolni ko‘rsatish'"
+                      :aria-label="employeePasswordVisible ? t('hidePassword') : t('showPassword')"
                       @click="employeePasswordVisible = !employeePasswordVisible"
                     >
                       <i :class="['bi', employeePasswordVisible ? 'bi-eye-slash' : 'bi-eye']"></i>
@@ -1068,10 +1325,10 @@ onMounted(initializeAuth)
               </form>
             </Transition>
 
-            <section class="panel">
-              <div class="section-header">
-                <h2>{{ t('employees') }}</h2>
-                <button class="primary-button fit" @click="showEmployeeComposer = true; resetEmployeeForm()">
+            <section class="panel employees-panel">
+                <div class="section-header">
+                  <h2>{{ t('employees') }}</h2>
+                <button v-if="!showEmployeeComposer" class="primary-button fit" @click="showEmployeeComposer = true; resetEmployeeForm()">
                   <i class="bi bi-person-plus"></i>
                   {{ t('createEmployee') }}
                 </button>
@@ -1080,14 +1337,16 @@ onMounted(initializeAuth)
               <div v-if="!employees.length" class="empty-state">{{ t('noEmployees') }}</div>
               <div v-else class="employee-table">
                 <article v-for="employee in employees" :key="employee.id" class="employee-row">
-                  <div class="avatar small">{{ getInitials(employee.full_name) }}</div>
-                  <div>
-                    <strong>{{ employee.full_name || employee.login_email || '—' }}</strong>
-                    <span>{{ employee.login_email || '—' }}</span>
+                  <div class="employee-identity">
+                    <div class="avatar small">{{ getInitials(employee.full_name) }}</div>
+                    <div>
+                      <strong>{{ employee.full_name || employee.login_email || '—' }}</strong>
+                      <span><i class="bi bi-person"></i>{{ employee.login_email || '—' }}</span>
+                    </div>
                   </div>
                   <span class="role-pill">{{ roleLabel(employee.role) }}</span>
-                  <span>{{ employee.phone || '—' }}</span>
-                  <span>{{ displayTelegram(employee.telegram_username) }}</span>
+                  <span class="employee-contact"><i class="bi bi-telephone"></i>{{ employee.phone || '—' }}</span>
+                  <span class="employee-contact"><i class="bi bi-telegram"></i>{{ displayTelegram(employee.telegram_username) }}</span>
                 </article>
               </div>
             </section>
@@ -1096,23 +1355,17 @@ onMounted(initializeAuth)
           <section v-else-if="activeView === 'calendar'" key="calendar" class="calendar-layout">
             <section class="panel">
               <div class="section-header">
-                <button class="ghost-button icon-only" @click="previousMonth" aria-label="Oldingi oy">
+                <button class="ghost-button icon-only" @click="previousMonth" :aria-label="t('previousMonth')">
                   <i class="bi bi-chevron-left"></i>
                 </button>
                 <h2>{{ calendarTitle }}</h2>
-                <button class="ghost-button icon-only" @click="nextMonth" aria-label="Keyingi oy">
+                <button class="ghost-button icon-only" @click="nextMonth" :aria-label="t('nextMonth')">
                   <i class="bi bi-chevron-right"></i>
                 </button>
               </div>
 
               <div class="weekday-row">
-                <span>Du</span>
-                <span>Se</span>
-                <span>Ch</span>
-                <span>Pa</span>
-                <span>Ju</span>
-                <span>Sh</span>
-                <span>Ya</span>
+                <span v-for="dayLabel in weekdayLabels" :key="dayLabel">{{ dayLabel }}</span>
               </div>
 
               <div class="calendar-grid">
@@ -1152,25 +1405,48 @@ onMounted(initializeAuth)
             </aside>
           </section>
 
-          <section v-else-if="activeView === 'settings'" key="settings" class="settings-layout">
-            <form class="panel form-panel" @submit.prevent="saveSettings">
-              <div class="section-header clean">
-                <h2>{{ t('settings') }}</h2>
-              </div>
+          <section v-else-if="activeView === 'settings'" key="settings" class="settings-catalog-layout">
+            <aside class="panel settings-index">
+              <strong>{{ t('settings') }}</strong>
+              <a href="#settings-profile"><i class="bi bi-person"></i>{{ t('profile') }}</a>
+              <a href="#settings-security"><i class="bi bi-shield-lock"></i>{{ t('security') }}</a>
+              <a href="#settings-appearance"><i class="bi bi-palette"></i>{{ t('appearance') }}</a>
+              <a href="#settings-account"><i class="bi bi-box-arrow-right"></i>{{ t('account') }}</a>
+            </aside>
 
-              <div class="form-grid">
-                <label>
-                  {{ t('fullName') }}
-                  <input v-model="settingsForm.full_name" />
-                </label>
-                <label>
-                  {{ t('phone') }}
-                  <input v-model="settingsForm.phone" placeholder="+998901234567" />
-                </label>
-                <label>
-                  {{ t('telegram') }}
-                  <input v-model="settingsForm.telegram_username" placeholder="@username" />
-                </label>
+            <form class="settings-sections" @submit.prevent="saveSettings">
+              <section id="settings-profile" class="panel settings-card">
+                <div class="settings-card-head">
+                  <i class="bi bi-person"></i>
+                  <div>
+                    <h2>{{ t('profile') }}</h2>
+                    <p>{{ t('settingsDescription') }}</p>
+                  </div>
+                </div>
+                <div class="form-grid">
+                  <label>
+                    {{ t('fullName') }}
+                    <input v-model="settingsForm.full_name" />
+                  </label>
+                  <label>
+                    {{ t('phone') }}
+                    <input v-model="settingsForm.phone" placeholder="+998901234567" />
+                  </label>
+                  <label>
+                    {{ t('telegram') }}
+                    <input v-model="settingsForm.telegram_username" placeholder="@username" />
+                  </label>
+                </div>
+              </section>
+
+              <section id="settings-security" class="panel settings-card">
+                <div class="settings-card-head">
+                  <i class="bi bi-shield-lock"></i>
+                  <div>
+                    <h2>{{ t('security') }}</h2>
+                    <p>{{ t('passwordValidation') }}</p>
+                  </div>
+                </div>
                 <label>
                   {{ t('password') }}
                   <div class="password-field">
@@ -1178,62 +1454,84 @@ onMounted(initializeAuth)
                       v-model="settingsForm.password"
                       :type="settingsPasswordVisible ? 'text' : 'password'"
                       autocomplete="new-password"
-                      placeholder="Yangi parol"
+                      :placeholder="t('newPasswordPlaceholder')"
                     />
                     <button
                       type="button"
                       class="password-toggle"
-                      :aria-label="settingsPasswordVisible ? 'Parolni yashirish' : 'Parolni ko‘rsatish'"
+                      :aria-label="settingsPasswordVisible ? t('hidePassword') : t('showPassword')"
                       @click="settingsPasswordVisible = !settingsPasswordVisible"
                     >
                       <i :class="['bi', settingsPasswordVisible ? 'bi-eye-slash' : 'bi-eye']"></i>
                     </button>
                   </div>
                 </label>
-                <label>
-                  {{ t('language') }}
-                  <select v-model="settingsForm.language">
-                    <option value="uz">UZ</option>
-                    <option value="ru">RU</option>
-                    <option value="uz_cyrl">Кирил</option>
-                  </select>
-                </label>
-                <label>
-                  {{ t('performance') }}
-                  <select v-model="settingsForm.performance_mode">
-                    <option value="balanced">{{ t('balanced') }}</option>
-                    <option value="compact">{{ t('compact') }}</option>
-                  </select>
-                </label>
-              </div>
+              </section>
 
-              <div class="settings-actions">
-                <button class="primary-button fit" :disabled="saving">
-                  <i class="bi bi-save"></i>
-                  {{ saving ? '...' : t('saveProfile') }}
-                </button>
-                <button type="button" class="ghost-button" @click="handleLogout">
-                  <i class="bi bi-box-arrow-right"></i>
-                  {{ t('logout') }}
-                </button>
-              </div>
+              <section id="settings-appearance" class="panel settings-card">
+                <div class="settings-card-head">
+                  <i class="bi bi-palette"></i>
+                  <div>
+                    <h2>{{ t('appearance') }}</h2>
+                    <p>{{ t('language') }} / {{ t('theme') }}</p>
+                  </div>
+                </div>
+                <div class="form-grid">
+                  <label>
+                    {{ t('language') }}
+                    <select v-model="settingsForm.language">
+                      <option value="uz">UZ</option>
+                      <option value="ru">RU</option>
+                      <option value="uz_cyrl">Кирил</option>
+                    </select>
+                  </label>
+                  <label>
+                    {{ t('performance') }}
+                    <select v-model="settingsForm.performance_mode">
+                      <option value="balanced">{{ t('balanced') }}</option>
+                      <option value="compact">{{ t('compact') }}</option>
+                    </select>
+                  </label>
+                  <label>
+                    {{ t('theme') }}
+                    <select v-model="themeMode">
+                      <option value="light">{{ t('light') }}</option>
+                      <option value="dark">{{ t('dark') }}</option>
+                    </select>
+                  </label>
+                </div>
+              </section>
+
+              <section id="settings-account" class="panel settings-card account-card">
+                <div class="profile-heading">
+                  <div class="avatar large">{{ getInitials(profile?.full_name) }}</div>
+                  <div>
+                    <h2>{{ profile?.full_name || 'User' }}</h2>
+                    <p><i class="bi bi-person-badge"></i>{{ roleLabel(profile?.role) }}</p>
+                  </div>
+                </div>
+                <dl class="detail-list">
+                  <div>
+                    <dt>{{ t('email') }}</dt>
+                    <dd><i class="bi bi-person"></i>{{ profile?.login_email || '—' }}</dd>
+                  </div>
+                  <div>
+                    <dt>{{ t('telegram') }}</dt>
+                    <dd><i class="bi bi-telegram"></i>{{ displayTelegram(profile?.telegram_username) }}</dd>
+                  </div>
+                </dl>
+                <div class="settings-actions">
+                  <button class="primary-button fit" :disabled="saving">
+                    <i class="bi bi-save"></i>
+                    {{ saving ? '...' : t('saveProfile') }}
+                  </button>
+                  <button type="button" class="ghost-button" @click="handleLogout">
+                    <i class="bi bi-box-arrow-right"></i>
+                    {{ t('logout') }}
+                  </button>
+                </div>
+              </section>
             </form>
-
-            <section class="panel profile-summary">
-              <div class="avatar large">{{ getInitials(profile?.full_name) }}</div>
-              <h2>{{ profile?.full_name || 'User' }}</h2>
-              <p>{{ roleLabel(profile?.role) }}</p>
-              <dl class="detail-list">
-                <div>
-                  <dt>{{ t('email') }}</dt>
-                  <dd>{{ profile?.login_email || '—' }}</dd>
-                </div>
-                <div>
-                  <dt>{{ t('telegram') }}</dt>
-                  <dd>{{ displayTelegram(profile?.telegram_username) }}</dd>
-                </div>
-              </dl>
-            </section>
           </section>
         </Transition>
       </section>
