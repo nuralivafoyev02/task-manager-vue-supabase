@@ -1,0 +1,12 @@
+name = "task-manager-vue-supabase"
+pages_build_output_dir = "dist"
+compatibility_date = "2026-05-14"
+
+[vars]
+# Cloudflare Pages dashboard orqali quyidagilarni Environment Variables sifatida kiriting:
+# VITE_SUPABASE_URL = "https://YOUR_PROJECT.supabase.co"
+# VITE_SUPABASE_ANON_KEY = "YOUR_SUPABASE_ANON_KEY"
+# SUPABASE_URL = "https://YOUR_PROJECT.supabase.co"
+# SUPABASE_SERVICE_ROLE_KEY = "YOUR_SERVICE_ROLE_KEY"  # Secret sifatida saqlang
+# TELEGRAM_BOT_TOKEN = "123456:BOT_TOKEN"              # Secret sifatida saqlang
+# TELEGRAM_WEBHOOK_SECRET = "RANDOM_LONG_SECRET"       # Secret sifatida saqlang
