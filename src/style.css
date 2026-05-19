@@ -1687,7 +1687,7 @@ textarea:focus {
 .weekday-row {
   display: grid;
   grid-template-columns: repeat(7, 1fr);
-  padding: 12px 14px;
+  padding: 8px 12px;
   color: var(--muted);
   font-size: 12px;
   font-weight: 900;
@@ -1703,13 +1703,72 @@ textarea:focus {
   grid-template-columns: repeat(7, 1fr);
 }
 
+.calendar-panel {
+  overflow: visible;
+}
+
+.calendar-header {
+  min-height: 52px;
+}
+
+.calendar-nav,
+.calendar-tools,
+.calendar-stat-strip {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.calendar-nav h2,
+.calendar-nav span,
+.calendar-detail-subtitle {
+  margin: 0;
+}
+
+.calendar-nav h2 {
+  font-size: 16px;
+}
+
+.calendar-nav span,
+.calendar-detail-subtitle {
+  color: var(--muted);
+  font-size: 12px;
+  font-weight: 800;
+}
+
+.calendar-tools {
+  flex-wrap: wrap;
+  justify-content: flex-end;
+}
+
+.calendar-stat-strip {
+  min-height: 34px;
+  padding: 0 9px;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: var(--surface-soft);
+}
+
+.calendar-stat-strip span {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  color: var(--muted);
+  font-size: 12px;
+  font-weight: 900;
+}
+
+.calendar-stat-strip .bi {
+  font-size: 8px;
+}
+
 .calendar-day {
   position: relative;
-  min-height: 104px;
+  min-height: 76px;
   display: grid;
   align-content: start;
-  gap: 10px;
-  padding: 10px;
+  gap: 6px;
+  padding: 7px;
   border: 0;
   border-right: 1px solid var(--line);
   border-bottom: 1px solid var(--line);
@@ -1732,8 +1791,8 @@ textarea:focus {
 }
 
 .calendar-day.today > span {
-  width: 28px;
-  height: 28px;
+  width: 24px;
+  height: 24px;
   display: grid;
   place-items: center;
   border-radius: 50%;
@@ -1744,9 +1803,10 @@ textarea:focus {
 
 .calendar-day small {
   position: absolute;
-  right: 10px;
-  bottom: 8px;
+  right: 8px;
+  bottom: 7px;
   color: var(--blue);
+  font-size: 12px;
   font-weight: 900;
 }
 
@@ -1754,11 +1814,99 @@ textarea:focus {
   display: flex;
   flex-wrap: wrap;
   align-items: center;
-  min-height: 24px;
+  min-height: 22px;
 }
 
 .calendar-avatars .avatar + .avatar {
   margin-left: -7px;
+}
+
+.calendar-avatar {
+  position: relative;
+}
+
+.calendar-avatar:hover::after {
+  content: attr(data-tooltip);
+  position: absolute;
+  left: 50%;
+  bottom: calc(100% + 8px);
+  z-index: 55;
+  width: max-content;
+  max-width: 220px;
+  padding: 6px 8px;
+  border-radius: 8px;
+  background: #0f172a;
+  color: white;
+  font-size: 12px;
+  font-weight: 800;
+  line-height: 1.35;
+  white-space: normal;
+  transform: translateX(-50%);
+  box-shadow: 0 12px 24px rgba(15, 23, 42, 0.18);
+  pointer-events: none;
+}
+
+.calendar-avatar:hover::before {
+  content: '';
+  position: absolute;
+  left: 50%;
+  bottom: calc(100% + 3px);
+  z-index: 56;
+  border: 5px solid transparent;
+  border-top-color: #0f172a;
+  transform: translateX(-50%);
+  pointer-events: none;
+}
+
+.avatar.more-count {
+  background: #f1f5f9;
+  color: #475569;
+  font-size: 9px;
+}
+
+.calendar-status-dots {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  min-height: 18px;
+}
+
+.calendar-status-dots span {
+  min-width: 18px;
+  height: 18px;
+  display: inline-grid;
+  place-items: center;
+  border-radius: 999px;
+  color: white;
+  font-size: 10px;
+  font-weight: 900;
+}
+
+.calendar-stat-strip .active-dot {
+  color: var(--blue);
+  background: transparent;
+}
+
+.calendar-stat-strip .done-dot {
+  color: var(--success);
+  background: transparent;
+}
+
+.calendar-stat-strip .overdue-dot {
+  color: var(--danger);
+  background: transparent;
+}
+
+.calendar-status-dots .active-dot {
+  background: var(--blue);
+}
+
+.calendar-status-dots .done-dot {
+  background: var(--success);
+}
+
+.calendar-status-dots .overdue-dot {
+  background: var(--danger);
 }
 
 .day-task-list article {
@@ -1970,11 +2118,15 @@ textarea:focus {
   }
 
   .calendar-day {
-    min-height: 78px;
-    padding: 8px;
+    min-height: 58px;
+    padding: 6px;
   }
 
   .calendar-avatars {
+    display: none;
+  }
+
+  .calendar-status-dots {
     display: none;
   }
 

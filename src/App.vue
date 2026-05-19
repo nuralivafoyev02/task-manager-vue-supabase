@@ -206,6 +206,19 @@ const calendarTitle = computed(() => {
 })
 
 const localeName = computed(() => getLocaleName(currentLanguage.value))
+const calendarMonthTasks = computed(() =>
+  tasks.value.filter((task) => {
+    if (!task.due_date) return false
+    const [year, month] = task.due_date.split('-').map(Number)
+    return year === calendarCursor.value.getFullYear() && month === calendarCursor.value.getMonth() + 1
+  })
+)
+const calendarMonthStats = computed(() => ({
+  total: calendarMonthTasks.value.length,
+  active: calendarMonthTasks.value.filter((task) => task.status !== 'completed' && task.status !== 'canceled').length,
+  completed: calendarMonthTasks.value.filter((task) => task.status === 'completed').length,
+  overdue: calendarMonthTasks.value.filter((task) => isOverdue(task)).length
+}))
 
 const calendarDays = computed(() => {
   const start = new Date(calendarCursor.value.getFullYear(), calendarCursor.value.getMonth(), 1)
@@ -219,19 +232,30 @@ const calendarDays = computed(() => {
     const iso = toIsoDate(date)
     const dayTasks = tasks.value.filter((task) => task.due_date === iso)
     const avatars = uniqueProfiles(dayTasks)
+    const statusCounts = getDayStatusCounts(dayTasks)
 
     return {
       date,
       iso,
       tasks: dayTasks,
       avatars,
+      assigneeCount: uniqueProfileCount(dayTasks),
+      statusCounts,
       currentMonth: date.getMonth() === calendarCursor.value.getMonth(),
       today: iso === todayIso.value
     }
   })
 })
 
-const selectedCalendarTasks = computed(() => tasks.value.filter((task) => task.due_date === selectedCalendarDate.value))
+const selectedCalendarTasks = computed(() =>
+  tasks.value
+    .filter((task) => task.due_date === selectedCalendarDate.value)
+    .sort((a, b) => {
+      if (taskDisplayStatus(a) === 'overdue' && taskDisplayStatus(b) !== 'overdue') return -1
+      if (taskDisplayStatus(a) !== 'overdue' && taskDisplayStatus(b) === 'overdue') return 1
+      return String(a.created_at || '').localeCompare(String(b.created_at || ''))
+    })
+)
 const weekdayLabels = computed(() => t('weekdays').split(','))
 const settingsSections = computed<Array<{ key: SettingsSectionKey; label: string; icon: string }>>(() => [
   { key: 'profile', label: t('profile'), icon: 'bi-person' },
@@ -380,6 +404,33 @@ function uniqueProfiles(dayTasks: Task[]) {
   return [...map.values()].slice(0, 4)
 }
 
+function uniqueProfileCount(dayTasks: Task[]) {
+  const ids = new Set<string>()
+  dayTasks.forEach((task) => {
+    const assignee = task.assignee || (task.assignee_id ? employeeMap.value.get(task.assignee_id) : null)
+    if (assignee?.id) ids.add(assignee.id)
+  })
+  return ids.size
+}
+
+function profileFullName(employee: Pick<Profile, 'full_name'>) {
+  return employee.full_name || '—'
+}
+
+function getDayStatusCounts(dayTasks: Task[]) {
+  return dayTasks.reduce(
+    (counts, task) => {
+      const status = taskDisplayStatus(task)
+      if (status === 'completed') counts.completed += 1
+      else if (status === 'canceled') counts.canceled += 1
+      else if (status === 'overdue') counts.overdue += 1
+      else counts.active += 1
+      return counts
+    },
+    { active: 0, completed: 0, overdue: 0, canceled: 0 }
+  )
+}
+
 function selectView(key: ViewKey) {
   activeView.value = key
   mobileMenuOpen.value = false
@@ -401,6 +452,12 @@ function previousMonth() {
 
 function nextMonth() {
   calendarCursor.value = new Date(calendarCursor.value.getFullYear(), calendarCursor.value.getMonth() + 1, 1)
+}
+
+function goToToday() {
+  const today = new Date()
+  calendarCursor.value = new Date(today.getFullYear(), today.getMonth(), 1)
+  selectedCalendarDate.value = todayIso.value
 }
 
 function fillSettingsForm() {
@@ -1030,7 +1087,7 @@ watch(errorMessage, (message) => {
               <div v-else class="empty-state compact">{{ t('noCompletedArchive') }}</div>
             </section>
 
-            <section class="panel">
+            <section class="panel calendar-panel">
               <div class="section-header">
                 <h2>{{ t('tasks') }}</h2>
                 <button class="link-button" @click="activeView = 'tasks'">
@@ -1341,14 +1398,30 @@ watch(errorMessage, (message) => {
 
           <section v-else-if="activeView === 'calendar'" key="calendar" class="calendar-layout">
             <section class="panel">
-              <div class="section-header">
-                <button class="ghost-button icon-only" @click="previousMonth" :aria-label="t('previousMonth')">
-                  <i class="bi bi-chevron-left"></i>
-                </button>
-                <h2>{{ calendarTitle }}</h2>
-                <button class="ghost-button icon-only" @click="nextMonth" :aria-label="t('nextMonth')">
-                  <i class="bi bi-chevron-right"></i>
-                </button>
+              <div class="section-header calendar-header">
+                <div class="calendar-nav">
+                  <button class="ghost-button icon-only" @click="previousMonth" :aria-label="t('previousMonth')">
+                    <i class="bi bi-chevron-left"></i>
+                  </button>
+                  <div>
+                    <h2>{{ calendarTitle }}</h2>
+                    <span>{{ calendarMonthStats.total }} {{ t('tasks') }}</span>
+                  </div>
+                  <button class="ghost-button icon-only" @click="nextMonth" :aria-label="t('nextMonth')">
+                    <i class="bi bi-chevron-right"></i>
+                  </button>
+                </div>
+                <div class="calendar-tools">
+                  <div class="calendar-stat-strip">
+                    <span><i class="bi bi-circle-fill active-dot"></i>{{ calendarMonthStats.active }}</span>
+                    <span><i class="bi bi-circle-fill done-dot"></i>{{ calendarMonthStats.completed }}</span>
+                    <span><i class="bi bi-circle-fill overdue-dot"></i>{{ calendarMonthStats.overdue }}</span>
+                  </div>
+                  <button class="ghost-button fit" @click="goToToday">
+                    <i class="bi bi-calendar-check"></i>
+                    {{ t('today') }}
+                  </button>
+                </div>
               </div>
 
               <div class="weekday-row">
@@ -1361,9 +1434,28 @@ watch(errorMessage, (message) => {
                   @click="selectedCalendarDate = day.iso">
                   <span>{{ formatDay(day.date) }}</span>
                   <div class="calendar-avatars">
-                    <span v-for="employee in day.avatars" :key="employee.id" class="avatar micro">
+                    <span
+                      v-for="employee in day.avatars"
+                      :key="employee.id"
+                      class="avatar micro calendar-avatar"
+                      :title="profileFullName(employee)"
+                      :aria-label="profileFullName(employee)"
+                      :data-tooltip="profileFullName(employee)"
+                    >
                       {{ getInitials(employee.full_name) }}
                     </span>
+                    <span
+                      v-if="day.assigneeCount > day.avatars.length"
+                      class="avatar micro more-count"
+                      :title="`${day.assigneeCount - day.avatars.length} ${t('more')}`"
+                    >
+                      +{{ day.assigneeCount - day.avatars.length }}
+                    </span>
+                  </div>
+                  <div v-if="day.tasks.length" class="calendar-status-dots" :aria-label="t('status')">
+                    <span v-if="day.statusCounts.active" class="active-dot">{{ day.statusCounts.active }}</span>
+                    <span v-if="day.statusCounts.completed" class="done-dot">{{ day.statusCounts.completed }}</span>
+                    <span v-if="day.statusCounts.overdue" class="overdue-dot">{{ day.statusCounts.overdue }}</span>
                   </div>
                   <small v-if="day.tasks.length">{{ day.tasks.length }}</small>
                 </button>
@@ -1372,7 +1464,10 @@ watch(errorMessage, (message) => {
 
             <aside class="panel detail-panel">
               <div class="section-header clean">
-                <h2>{{ formatDate(selectedCalendarDate) }}</h2>
+                <div>
+                  <h2>{{ formatDate(selectedCalendarDate) }}</h2>
+                  <p class="calendar-detail-subtitle">{{ selectedCalendarTasks.length }} {{ t('tasks') }}</p>
+                </div>
               </div>
 
               <div v-if="!selectedCalendarTasks.length" class="empty-state compact">{{ t('calendarEmpty') }}</div>
