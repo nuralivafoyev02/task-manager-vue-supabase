@@ -1,9 +1,10 @@
-import { adminClient, methodNotAllowed, normalizeTelegramUsername, readJsonBody, sendJson } from './_shared.js'
+import { adminClient, getTelegramBotToken, methodNotAllowed, normalizeTelegramUsername, readJsonBody, sendJson } from './_shared.js'
 
 async function sendBotMessage(chatId, text) {
-  if (!process.env.TELEGRAM_BOT_TOKEN || !chatId) return
+  const token = getTelegramBotToken()
+  if (!token || !chatId) return
 
-  await fetch(`https://api.telegram.org/bot${process.env.TELEGRAM_BOT_TOKEN}/sendMessage`, {
+  await fetch(`https://api.telegram.org/bot${token}/sendMessage`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({ chat_id: chatId, text })

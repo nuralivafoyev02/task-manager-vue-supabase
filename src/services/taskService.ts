@@ -342,14 +342,10 @@ export async function updateTaskStatus(task: Task, status: PersistedTaskStatus, 
   const updatePayload: {
     status: PersistedTaskStatus
     completed_at: string | null
-    cancel_reason?: string | null
   } = {
     status,
     completed_at: status === 'completed' ? new Date().toISOString() : null
   }
-
-  if (status === 'canceled') updatePayload.cancel_reason = cancelReason.trim() || null
-  else if (task.status === 'canceled' || task.cancel_reason) updatePayload.cancel_reason = null
 
   const { data, error } = await supabase
     .from('tasks')
@@ -359,8 +355,17 @@ export async function updateTaskStatus(task: Task, status: PersistedTaskStatus, 
     .single()
 
   if (error) throw error
-  await addActivity(task.id, 'task.status_changed', `Status changed to ${status}`)
-  return data as Task
+  const note =
+    status === 'canceled' && cancelReason.trim()
+      ? `Status changed to ${status}: ${cancelReason.trim()}`
+      : `Status changed to ${status}`
+  addActivity(task.id, 'task.status_changed', note).catch((error) => {
+    console.warn('Activity was not saved:', error instanceof Error ? error.message : error)
+  })
+  return {
+    ...(data as Task),
+    cancel_reason: status === 'canceled' ? cancelReason.trim() || null : null
+  }
 }
 
 export async function deleteTask(taskId: string) {

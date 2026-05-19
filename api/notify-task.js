@@ -1,4 +1,4 @@
-import { adminClient, getActor, methodNotAllowed, readJsonBody, sendActorError, sendJson } from './_shared.js'
+import { adminClient, getActor, getTelegramBotToken, methodNotAllowed, readJsonBody, sendActorError, sendJson } from './_shared.js'
 
 function formatDate(date) {
   if (!date) return 'sana belgilanmagan'
@@ -41,13 +41,20 @@ export default async function handler(req, res) {
     }
 
     if (!task.assignee) return sendJson(res, 200, { ok: true, skipped: 'Task has no assignee' })
-    if (!process.env.TELEGRAM_BOT_TOKEN) {
-      return sendJson(res, 200, { ok: true, skipped: 'Telegram bot token is not configured' })
+
+    const token = getTelegramBotToken()
+    if (!token) {
+      return sendJson(res, 500, { ok: false, error: 'Telegram bot token is not configured' })
     }
 
-    const username = task.assignee.telegram_username
-    const chatId = task.assignee.telegram_chat_id || (username ? `@${username}` : '')
-    if (!chatId) return sendJson(res, 200, { ok: true, skipped: 'Assignee Telegram username/chat is missing' })
+    const chatId = task.assignee.telegram_chat_id
+    if (!chatId) {
+      return sendJson(res, 409, {
+        ok: false,
+        error: 'Assignee Telegram chat is not connected',
+        hint: 'Bot xodimga yozishi uchun xodim avval botga /start yuborishi kerak. Shunda webhook telegram_chat_id ni profilga bog‘laydi.'
+      })
+    }
 
     const text = [
       'Sizga yangi vazifa biriktirildi.',
@@ -60,7 +67,7 @@ export default async function handler(req, res) {
       .filter(Boolean)
       .join('\n')
 
-    const telegramResponse = await fetch(`https://api.telegram.org/bot${process.env.TELEGRAM_BOT_TOKEN}/sendMessage`, {
+    const telegramResponse = await fetch(`https://api.telegram.org/bot${token}/sendMessage`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({

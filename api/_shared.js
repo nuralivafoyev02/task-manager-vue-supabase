@@ -68,6 +68,10 @@ export function adminClient() {
   })
 }
 
+export function getTelegramBotToken() {
+  return process.env.TELEGRAM_BOT_TOKEN || process.env.BOT_TOKEN || ''
+}
+
 export async function readJsonBody(req) {
   if (req.body && typeof req.body === 'object') return req.body
   if (typeof req.body === 'string') return JSON.parse(req.body || '{}')

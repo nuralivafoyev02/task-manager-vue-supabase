@@ -48,6 +48,9 @@ import type {
   ViewKey
 } from './types'
 
+type SettingsSectionKey = 'profile' | 'security' | 'appearance' | 'account'
+type CompletedArchiveMode = 'week' | 'month'
+
 const savedView = localStorage.getItem(STORAGE_KEYS.activeView) as ViewKey | null
 const savedTheme = localStorage.getItem(STORAGE_KEYS.theme) as ThemeMode | null
 
@@ -79,10 +82,14 @@ const showTaskComposer = ref(false)
 const showEmployeeComposer = ref(false)
 const editingTaskId = ref<string | null>(null)
 const taskActionMenuId = ref<string | null>(null)
+const savingTaskIds = ref(new Set<string>())
 const cancelDialogTask = ref<Task | null>(null)
 const cancelReason = ref('')
 const selectedCalendarDate = ref(toIsoDate(new Date()))
 const calendarCursor = ref(new Date(new Date().getFullYear(), new Date().getMonth(), 1))
+const activeSettingsSection = ref<SettingsSectionKey>('profile')
+const completedArchiveMode = ref<CompletedArchiveMode>('week')
+const selectedCompletedFolderId = ref<string | null>(null)
 
 const authForm = reactive({
   email: '',
@@ -226,6 +233,17 @@ const calendarDays = computed(() => {
 
 const selectedCalendarTasks = computed(() => tasks.value.filter((task) => task.due_date === selectedCalendarDate.value))
 const weekdayLabels = computed(() => t('weekdays').split(','))
+const settingsSections = computed<Array<{ key: SettingsSectionKey; label: string; icon: string }>>(() => [
+  { key: 'profile', label: t('profile'), icon: 'bi-person' },
+  { key: 'security', label: t('security'), icon: 'bi-shield-lock' },
+  { key: 'appearance', label: t('appearance'), icon: 'bi-palette' },
+  { key: 'account', label: t('account'), icon: 'bi-person-badge' }
+])
+const completedTaskFolders = computed(() => buildCompletedFolders(completedArchiveMode.value))
+const selectedCompletedFolder = computed(() => {
+  if (!selectedCompletedFolderId.value) return null
+  return completedTaskFolders.value.find((folder) => folder.id === selectedCompletedFolderId.value) || null
+})
 
 function t(key: string) {
   return translate(currentLanguage.value, key)
@@ -255,6 +273,78 @@ function taskDisplayStatus(task: Task): TaskStatus {
 
 function statusLabel(status: TaskStatus) {
   return t(status)
+}
+
+function getTaskCompletionDate(task: Task) {
+  const source = task.completed_at || task.updated_at || task.created_at
+  return source ? new Date(source) : null
+}
+
+function startOfWeek(date: Date) {
+  const start = new Date(date.getFullYear(), date.getMonth(), date.getDate())
+  const mondayOffset = (start.getDay() + 6) % 7
+  start.setDate(start.getDate() - mondayOffset)
+  return start
+}
+
+function addDays(date: Date, days: number) {
+  const next = new Date(date)
+  next.setDate(next.getDate() + days)
+  return next
+}
+
+function buildCompletedFolders(mode: CompletedArchiveMode) {
+  const folders = new Map<
+    string,
+    {
+      id: string
+      label: string
+      range: string
+      count: number
+      tasks: Task[]
+      sortTime: number
+    }
+  >()
+
+  completedTasks.value.forEach((task) => {
+    const completedDate = getTaskCompletionDate(task)
+    if (!completedDate || Number.isNaN(completedDate.getTime())) return
+
+    const start = mode === 'week' ? startOfWeek(completedDate) : new Date(completedDate.getFullYear(), completedDate.getMonth(), 1)
+    const end = mode === 'week' ? addDays(start, 6) : new Date(completedDate.getFullYear(), completedDate.getMonth() + 1, 0)
+    const id = mode === 'week' ? `week-${toIsoDate(start)}` : `month-${start.getFullYear()}-${String(start.getMonth() + 1).padStart(2, '0')}`
+    const label =
+      mode === 'week'
+        ? `${formatDate(toIsoDate(start))} - ${formatDate(toIsoDate(end))}`
+        : new Intl.DateTimeFormat(localeName.value, { month: 'long', year: 'numeric' }).format(start)
+    const range = mode === 'week' ? t('weeklyFolder') : t('monthlyFolder')
+    const existing = folders.get(id)
+
+    if (existing) {
+      existing.count += 1
+      existing.tasks.push(task)
+    } else {
+      folders.set(id, {
+        id,
+        label,
+        range,
+        count: 1,
+        tasks: [task],
+        sortTime: start.getTime()
+      })
+    }
+  })
+
+  return [...folders.values()]
+    .map((folder) => ({
+      ...folder,
+      tasks: [...folder.tasks].sort((a, b) => {
+        const aTime = getTaskCompletionDate(a)?.getTime() || 0
+        const bTime = getTaskCompletionDate(b)?.getTime() || 0
+        return bTime - aTime
+      })
+    }))
+    .sort((a, b) => b.sortTime - a.sortTime)
 }
 
 function showCancelReason(task: Task, event?: MouseEvent) {
@@ -296,6 +386,15 @@ function selectView(key: ViewKey) {
   profileMenuOpen.value = false
 }
 
+function selectSettingsSection(key: SettingsSectionKey) {
+  activeSettingsSection.value = key
+}
+
+function setCompletedArchiveMode(mode: CompletedArchiveMode) {
+  completedArchiveMode.value = mode
+  selectedCompletedFolderId.value = null
+}
+
 function previousMonth() {
   calendarCursor.value = new Date(calendarCursor.value.getFullYear(), calendarCursor.value.getMonth() - 1, 1)
 }
@@ -311,7 +410,7 @@ function fillSettingsForm() {
   settingsForm.telegram_username = profile.value?.telegram_username || ''
   settingsForm.avatar_url = profile.value?.avatar_url || ''
   settingsForm.language = profile.value?.language || 'uz'
-  settingsForm.performance_mode = profile.value?.performance_mode || 'balanced'
+  settingsForm.performance_mode = 'balanced'
   settingsForm.password = ''
 }
 
@@ -498,16 +597,47 @@ async function submitEmployee() {
 }
 
 async function changeStatus(task: Task, status: PersistedTaskStatus) {
+  if (savingTaskIds.value.has(task.id)) return
   resetMessages()
+  const previousTask = { ...task, checklist: task.checklist ? [...task.checklist] : [] }
+  setTaskSaving(task.id, true)
+  patchTask(task.id, {
+    status,
+    completed_at: status === 'completed' ? new Date().toISOString() : null,
+    cancel_reason: status === 'canceled' ? task.cancel_reason : status === 'todo' || status === 'in_progress' ? null : task.cancel_reason
+  })
+
   try {
     const updatedTask = await updateTaskStatus(task, status)
-    tasks.value = tasks.value.map((currentTask) =>
-      currentTask.id === task.id ? { ...currentTask, ...updatedTask, checklist: currentTask.checklist } : currentTask
-    )
-    await refreshData()
+    patchTask(task.id, updatedTask)
+    loadActivity()
+      .then((items) => {
+        activity.value = items
+      })
+      .catch(() => undefined)
   } catch (error) {
+    patchTask(task.id, previousTask)
     errorMessage.value = error instanceof Error ? error.message : t('statusError')
+  } finally {
+    setTaskSaving(task.id, false)
   }
+}
+
+function patchTask(taskId: string, patch: Partial<Task>) {
+  tasks.value = tasks.value.map((currentTask) =>
+    currentTask.id === taskId ? { ...currentTask, ...patch, checklist: currentTask.checklist } : currentTask
+  )
+}
+
+function setTaskSaving(taskId: string, isSaving: boolean) {
+  const next = new Set(savingTaskIds.value)
+  if (isSaving) next.add(taskId)
+  else next.delete(taskId)
+  savingTaskIds.value = next
+}
+
+function isTaskSaving(task: Task) {
+  return savingTaskIds.value.has(task.id)
 }
 
 function cancelTask(task: Task) {
@@ -534,18 +664,22 @@ async function confirmCancelTask() {
 
   resetMessages()
   saving.value = true
+  setTaskSaving(task.id, true)
   try {
     const updatedTask = await updateTaskStatus(task, 'canceled', reason)
-    tasks.value = tasks.value.map((currentTask) =>
-      currentTask.id === task.id ? { ...currentTask, ...updatedTask, checklist: currentTask.checklist } : currentTask
-    )
+    patchTask(task.id, updatedTask)
     noticeMessage.value = t('taskCanceled')
     closeCancelDialog()
-    await refreshData()
+    loadActivity()
+      .then((items) => {
+        activity.value = items
+      })
+      .catch(() => undefined)
   } catch (error) {
     errorMessage.value = error instanceof Error ? error.message : t('cannotCancel')
   } finally {
     saving.value = false
+    setTaskSaving(task.id, false)
   }
 }
 
@@ -602,7 +736,7 @@ async function saveSettings() {
       telegram_username: normalizeTelegramUsername(settingsForm.telegram_username || ''),
       avatar_url: settingsForm.avatar_url || null,
       language: settingsForm.language,
-      performance_mode: settingsForm.performance_mode
+      performance_mode: 'balanced'
     })
 
     fillSettingsForm()
@@ -648,7 +782,7 @@ watch(errorMessage, (message) => {
 
 <template>
   <main
-    :class="['app-shell', `theme-${themeMode}`, settingsForm.performance_mode === 'compact' && 'performance-compact']">
+    :class="['app-shell', `theme-${themeMode}`]">
     <ToastStack :toasts="toasts" @dismiss="dismissToast" />
     <CancelTaskModal
       v-model:reason="cancelReason"
@@ -658,6 +792,14 @@ watch(errorMessage, (message) => {
       @close="closeCancelDialog"
       @confirm="confirmCancelTask"
     />
+    <Transition name="fade">
+      <button
+        v-if="taskActionMenuId"
+        class="task-menu-scrim"
+        :aria-label="t('close')"
+        @click="taskActionMenuId = null"
+      ></button>
+    </Transition>
 
     <section v-if="isNotFoundRoute" class="not-found-screen">
       <div class="not-found-panel">
@@ -816,6 +958,71 @@ watch(errorMessage, (message) => {
               </div>
             </div>
 
+            <section class="panel dashboard-completed-panel">
+              <div class="section-header">
+                <div>
+                  <h2>{{ t('completedArchive') }}</h2>
+                  <p>{{ completedArchiveMode === 'week' ? t('weeklyCompletedHelp') : t('monthlyCompletedHelp') }}</p>
+                </div>
+                <div class="segmented-control">
+                  <button
+                    type="button"
+                    :class="{ active: completedArchiveMode === 'week' }"
+                    @click="setCompletedArchiveMode('week')"
+                  >
+                    {{ t('weekly') }}
+                  </button>
+                  <button
+                    type="button"
+                    :class="{ active: completedArchiveMode === 'month' }"
+                    @click="setCompletedArchiveMode('month')"
+                  >
+                    {{ t('monthly') }}
+                  </button>
+                </div>
+              </div>
+
+              <template v-if="selectedCompletedFolder">
+                <div class="folder-detail-head">
+                  <button class="ghost-button fit" @click="selectedCompletedFolderId = null">
+                    <i class="bi bi-arrow-left"></i>
+                    {{ t('back') }}
+                  </button>
+                  <div>
+                    <strong>{{ selectedCompletedFolder.label }}</strong>
+                    <span>{{ selectedCompletedFolder.count }} {{ t('completedTasks') }}</span>
+                  </div>
+                </div>
+                <div class="task-list compact-list">
+                  <article v-for="task in selectedCompletedFolder.tasks" :key="task.id" class="task-row compact">
+                    <span class="status-dot completed"></span>
+                    <div class="task-main">
+                      <strong class="done">{{ task.title }}</strong>
+                      <span>{{ task.assignee?.full_name || employeeMap.get(task.assignee_id || '')?.full_name || '—' }}</span>
+                    </div>
+                    <StatusBadge :status="'completed'" :label="t('completed')" />
+                    <span class="muted-text">{{ formatDate(task.due_date) }}</span>
+                  </article>
+                </div>
+              </template>
+
+              <div v-else-if="completedTaskFolders.length" class="folder-grid">
+                <button
+                  v-for="folder in completedTaskFolders"
+                  :key="folder.id"
+                  class="folder-card"
+                  @click="selectedCompletedFolderId = folder.id"
+                >
+                  <i class="bi bi-folder-fill"></i>
+                  <span>{{ folder.range }}</span>
+                  <strong>{{ folder.label }}</strong>
+                  <small>{{ folder.count }} {{ t('completedTasks') }}</small>
+                </button>
+              </div>
+
+              <div v-else class="empty-state compact">{{ t('noCompletedArchive') }}</div>
+            </section>
+
             <section class="panel">
               <div class="section-header">
                 <h2>{{ t('tasks') }}</h2>
@@ -828,11 +1035,17 @@ watch(errorMessage, (message) => {
                 <article v-for="task in filteredTasks" :key="task.id"
                   :class="['task-row', { selected: selectedTask?.id === task.id }]" @click="selectedTaskId = task.id">
                   <button class="status-dot" :class="taskDisplayStatus(task)"
+                    :disabled="isTaskSaving(task)"
                     @click.stop="changeStatus(task, task.status === 'completed' ? 'todo' : 'completed')"
-                    :title="statusLabel(taskDisplayStatus(task))"></button>
+                    :title="isTaskSaving(task) ? t('savingChanges') : statusLabel(taskDisplayStatus(task))">
+                    <i v-if="isTaskSaving(task)" class="bi bi-arrow-repeat spin"></i>
+                  </button>
                   <div class="task-main">
                     <strong :class="{ done: task.status === 'completed' }">{{ task.title }}</strong>
-                    <span>{{ task.assignee?.full_name || employeeMap.get(task.assignee_id || '')?.full_name || '—'
+                    <span v-if="isTaskSaving(task)" class="status-saving-text">
+                      <i class="bi bi-arrow-repeat spin"></i>{{ t('savingChanges') }}
+                    </span>
+                    <span v-else>{{ task.assignee?.full_name || employeeMap.get(task.assignee_id || '')?.full_name || '—'
                       }}</span>
                   </div>
                   <StatusBadge
@@ -924,7 +1137,7 @@ watch(errorMessage, (message) => {
             </div>
 
             <div class="content-grid">
-              <section class="panel">
+              <section class="panel task-table-panel">
                 <div class="section-header">
                   <h2>{{ t('tasks') }}</h2>
                   <button class="link-button" @click="showTaskComposer = true; resetTaskForm()">
@@ -938,11 +1151,17 @@ watch(errorMessage, (message) => {
                   <article v-for="task in filteredTasks" :key="task.id"
                     :class="['task-row', { selected: selectedTask?.id === task.id }]" @click="selectedTaskId = task.id">
                     <button class="status-dot" :class="taskDisplayStatus(task)"
+                      :disabled="isTaskSaving(task)"
                       @click.stop="changeStatus(task, task.status === 'completed' ? 'todo' : 'completed')"
-                      :title="statusLabel(taskDisplayStatus(task))"></button>
+                      :title="isTaskSaving(task) ? t('savingChanges') : statusLabel(taskDisplayStatus(task))">
+                      <i v-if="isTaskSaving(task)" class="bi bi-arrow-repeat spin"></i>
+                    </button>
                     <div class="task-main">
                       <strong :class="{ done: task.status === 'completed' }">{{ task.title }}</strong>
-                      <span>{{ task.assignee?.full_name || employeeMap.get(task.assignee_id || '')?.full_name || '—'
+                      <span v-if="isTaskSaving(task)" class="status-saving-text">
+                        <i class="bi bi-arrow-repeat spin"></i>{{ t('savingChanges') }}
+                      </span>
+                      <span v-else>{{ task.assignee?.full_name || employeeMap.get(task.assignee_id || '')?.full_name || '—'
                         }}</span>
                     </div>
                     <StatusBadge
@@ -957,12 +1176,14 @@ watch(errorMessage, (message) => {
                       :aria-label="t('actions')">
                       <i class="bi bi-three-dots"></i>
                     </button>
-                    <div v-if="taskActionMenuId === task.id" class="task-actions-menu" @click.stop>
-                      <button @click="startEditTask(task)"><i class="bi bi-pencil"></i>{{ t('editTask') }}</button>
-                      <button @click="cancelTask(task)"><i class="bi bi-x-circle"></i>{{ t('cancelTask') }}</button>
-                      <button class="danger-text" @click="removeTask(task)"><i class="bi bi-trash3"></i>{{ t('delete')
-                        }}</button>
-                    </div>
+                    <Transition name="task-menu">
+                      <div v-if="taskActionMenuId === task.id" class="task-actions-menu" @click.stop>
+                        <button @click="startEditTask(task)"><i class="bi bi-pencil"></i>{{ t('editTask') }}</button>
+                        <button @click="cancelTask(task)"><i class="bi bi-x-circle"></i>{{ t('cancelTask') }}</button>
+                        <button class="danger-text" @click="removeTask(task)"><i class="bi bi-trash3"></i>{{ t('delete')
+                          }}</button>
+                      </div>
+                    </Transition>
                   </article>
                 </div>
               </section>
@@ -998,12 +1219,12 @@ watch(errorMessage, (message) => {
                   <p class="description-text">{{ selectedTask.description || '—' }}</p>
 
                   <div class="status-actions">
-                    <button class="ghost-button" @click="changeStatus(selectedTask, 'todo')">{{ t('todo') }}</button>
-                    <button class="ghost-button" @click="changeStatus(selectedTask, 'in_progress')">{{ t('in_progress')
+                    <button class="ghost-button" :disabled="isTaskSaving(selectedTask)" @click="changeStatus(selectedTask, 'todo')">{{ t('todo') }}</button>
+                    <button class="ghost-button" :disabled="isTaskSaving(selectedTask)" @click="changeStatus(selectedTask, 'in_progress')">{{ t('in_progress')
                       }}</button>
-                    <button class="primary-button fit" @click="changeStatus(selectedTask, 'completed')">{{
-                      t('completed') }}</button>
-                    <button class="ghost-button danger-text" @click="cancelTask(selectedTask)">{{ t('cancelTask')
+                    <button class="primary-button fit" :disabled="isTaskSaving(selectedTask)" @click="changeStatus(selectedTask, 'completed')">{{
+                      isTaskSaving(selectedTask) ? t('savingChanges') : t('completed') }}</button>
+                    <button class="ghost-button danger-text" :disabled="isTaskSaving(selectedTask)" @click="cancelTask(selectedTask)">{{ t('cancelTask')
                       }}</button>
                   </div>
 
@@ -1173,14 +1394,19 @@ watch(errorMessage, (message) => {
           <section v-else-if="activeView === 'settings'" key="settings" class="settings-catalog-layout">
             <aside class="panel settings-index">
               <strong>{{ t('settings') }}</strong>
-              <a href="#settings-profile"><i class="bi bi-person"></i>{{ t('profile') }}</a>
-              <a href="#settings-security"><i class="bi bi-shield-lock"></i>{{ t('security') }}</a>
-              <a href="#settings-appearance"><i class="bi bi-palette"></i>{{ t('appearance') }}</a>
-              <a href="#settings-account"><i class="bi bi-box-arrow-right"></i>{{ t('account') }}</a>
+              <button
+                v-for="section in settingsSections"
+                :key="section.key"
+                type="button"
+                :class="{ active: activeSettingsSection === section.key }"
+                @click="selectSettingsSection(section.key)"
+              >
+                <i :class="['bi', section.icon]"></i>{{ section.label }}
+              </button>
             </aside>
 
             <form class="settings-sections" @submit.prevent="saveSettings">
-              <section id="settings-profile" class="panel settings-card">
+              <section v-if="activeSettingsSection === 'profile'" class="panel settings-card">
                 <div class="settings-card-head">
                   <i class="bi bi-person"></i>
                   <div>
@@ -1189,14 +1415,15 @@ watch(errorMessage, (message) => {
                   </div>
                 </div>
                 <div class="avatar-uploader">
-                  <div class="avatar large">
+                  <div class="avatar-preview">
                     <img v-if="settingsForm.avatar_url" :src="settingsForm.avatar_url" alt="" />
                     <span v-else>{{ getInitials(settingsForm.full_name) }}</span>
                   </div>
                   <div>
                     <strong>{{ t('profileImage') }}</strong>
+                    <p>{{ t('profileImageHelp') }}</p>
                     <div class="avatar-actions">
-                      <label class="ghost-button fit">
+                      <label class="primary-button fit">
                         <i class="bi bi-image"></i>
                         {{ t('changeImage') }}
                         <input type="file" accept="image/*" @change="handleAvatarFile" />
@@ -1228,7 +1455,7 @@ watch(errorMessage, (message) => {
                 </div>
               </section>
 
-              <section id="settings-security" class="panel settings-card">
+              <section v-else-if="activeSettingsSection === 'security'" class="panel settings-card">
                 <div class="settings-card-head">
                   <i class="bi bi-shield-lock"></i>
                   <div>
@@ -1250,7 +1477,7 @@ watch(errorMessage, (message) => {
                 </label>
               </section>
 
-              <section id="settings-appearance" class="panel settings-card">
+              <section v-else-if="activeSettingsSection === 'appearance'" class="panel settings-card">
                 <div class="settings-card-head">
                   <i class="bi bi-palette"></i>
                   <div>
@@ -1262,16 +1489,9 @@ watch(errorMessage, (message) => {
                   <label>
                     {{ t('language') }}
                     <select v-model="settingsForm.language">
-                      <option value="uz">UZ</option>
-                      <option value="ru">RU</option>
-                      <option value="uz_cyrl">Кирил</option>
-                    </select>
-                  </label>
-                  <label>
-                    {{ t('performance') }}
-                    <select v-model="settingsForm.performance_mode">
-                      <option value="balanced">{{ t('balanced') }}</option>
-                      <option value="compact">{{ t('compact') }}</option>
+                      <option value="uz">{{ t('languageUzbek') }}</option>
+                      <option value="ru">{{ t('languageRussian') }}</option>
+                      <option value="uz_cyrl">{{ t('languageCyrillic') }}</option>
                     </select>
                   </label>
                   <label>
@@ -1284,7 +1504,7 @@ watch(errorMessage, (message) => {
                 </div>
               </section>
 
-              <section id="settings-account" class="panel settings-card account-card">
+              <section v-else class="panel settings-card account-card">
                 <div class="profile-heading">
                   <div class="avatar large">
                     <img v-if="profile?.avatar_url" :src="profile.avatar_url" alt="" />
@@ -1305,17 +1525,18 @@ watch(errorMessage, (message) => {
                     <dd><i class="bi bi-telegram"></i>{{ displayTelegram(profile?.telegram_username) }}</dd>
                   </div>
                 </dl>
-                <div class="settings-actions">
-                  <button class="primary-button fit" :disabled="saving">
-                    <i class="bi bi-save"></i>
-                    {{ saving ? '...' : t('saveProfile') }}
-                  </button>
-                  <button type="button" class="ghost-button" @click="handleLogout">
-                    <i class="bi bi-box-arrow-right"></i>
-                    {{ t('logout') }}
-                  </button>
-                </div>
               </section>
+
+              <div class="panel settings-footer">
+                <button class="primary-button fit" :disabled="saving">
+                  <i class="bi bi-save"></i>
+                  {{ saving ? '...' : t('saveProfile') }}
+                </button>
+                <button type="button" class="ghost-button" @click="handleLogout">
+                  <i class="bi bi-box-arrow-right"></i>
+                  {{ t('logout') }}
+                </button>
+              </div>
             </form>
           </section>
         </Transition>

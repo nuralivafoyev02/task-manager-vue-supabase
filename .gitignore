@@ -2,3 +2,4 @@
 .dev.vars
 dist
 node_modules
+.vercel
