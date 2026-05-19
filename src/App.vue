@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { computed, onMounted, reactive, ref, watch } from 'vue'
+import { computed, onBeforeUnmount, onMounted, reactive, ref, watch } from 'vue'
 import { STORAGE_KEYS, VIEW_KEYS } from './appConfig'
 import CancelTaskModal from './components/CancelTaskModal.vue'
 import StatusBadge from './components/StatusBadge.vue'
@@ -640,6 +640,14 @@ function isTaskSaving(task: Task) {
   return savingTaskIds.value.has(task.id)
 }
 
+function toggleTaskActionMenu(taskId: string) {
+  taskActionMenuId.value = taskActionMenuId.value === taskId ? null : taskId
+}
+
+function closeTaskActionMenu() {
+  taskActionMenuId.value = null
+}
+
 function cancelTask(task: Task) {
   resetMessages()
   taskActionMenuId.value = null
@@ -761,7 +769,14 @@ function handleAvatarFile(event: Event) {
   input.value = ''
 }
 
-onMounted(initializeAuth)
+onMounted(() => {
+  window.addEventListener('click', closeTaskActionMenu)
+  initializeAuth()
+})
+
+onBeforeUnmount(() => {
+  window.removeEventListener('click', closeTaskActionMenu)
+})
 
 watch(activeView, (view) => {
   localStorage.setItem(STORAGE_KEYS.activeView, view)
@@ -792,14 +807,6 @@ watch(errorMessage, (message) => {
       @close="closeCancelDialog"
       @confirm="confirmCancelTask"
     />
-    <Transition name="fade">
-      <button
-        v-if="taskActionMenuId"
-        class="task-menu-scrim"
-        :aria-label="t('close')"
-        @click="taskActionMenuId = null"
-      ></button>
-    </Transition>
 
     <section v-if="isNotFoundRoute" class="not-found-screen">
       <div class="not-found-panel">
@@ -1172,7 +1179,7 @@ watch(errorMessage, (message) => {
                     />
                     <span class="muted-text">{{ formatDate(task.due_date) }}</span>
                     <button class="ghost-button icon-only"
-                      @click.stop="taskActionMenuId = taskActionMenuId === task.id ? null : task.id"
+                      @click.stop="toggleTaskActionMenu(task.id)"
                       :aria-label="t('actions')">
                       <i class="bi bi-three-dots"></i>
                     </button>

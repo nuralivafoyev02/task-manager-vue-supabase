@@ -1130,14 +1130,6 @@ button:disabled {
   overflow: visible;
 }
 
-.task-menu-scrim {
-  position: fixed;
-  inset: 0;
-  z-index: 35;
-  border: 0;
-  background: transparent;
-}
-
 .task-row {
   position: relative;
   display: grid;
