@@ -191,6 +191,38 @@ export async function createEmployee(payload: EmployeeCreatePayload) {
   return body.profile as Profile
 }
 
+export async function updateEmployee(payload: EmployeeCreatePayload & { id: string; password?: string }) {
+  const token = await getAccessToken()
+  const response = await fetch('/api/employees', {
+    method: 'PATCH',
+    headers: {
+      'Content-Type': 'application/json',
+      Authorization: `Bearer ${token}`
+    },
+    body: JSON.stringify({
+      ...payload,
+      login_email: normalizeLoginIdentifier(payload.login_email),
+      telegram_username: payload.telegram_username ? normalizeTelegramUsername(payload.telegram_username) : ''
+    })
+  })
+
+  if (!response.ok) throw new Error(await readApiError(response))
+  const body = await response.json()
+  return body.profile as Profile
+}
+
+export async function deleteEmployee(employeeId: string) {
+  const token = await getAccessToken()
+  const response = await fetch(`/api/employees?id=${encodeURIComponent(employeeId)}`, {
+    method: 'DELETE',
+    headers: {
+      Authorization: `Bearer ${token}`
+    }
+  })
+
+  if (!response.ok) throw new Error(await readApiError(response))
+}
+
 export async function loadProjects(): Promise<Project[]> {
   const { data, error } = await supabase
     .from('projects')

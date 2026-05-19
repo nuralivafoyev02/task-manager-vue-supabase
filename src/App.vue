@@ -10,6 +10,7 @@ import { isSupabaseConfigured, supabase } from './lib/supabase'
 import {
   createEmployee,
   createTask,
+  deleteEmployee,
   deleteTask,
   loadActivity,
   loadProfile,
@@ -21,6 +22,7 @@ import {
   signOut,
   updateAccountCredentials,
   updateChecklistItem,
+  updateEmployee,
   updateTask,
   updateTaskStatus,
   upsertProfile
@@ -50,6 +52,7 @@ import type {
 
 type SettingsSectionKey = 'profile' | 'security' | 'appearance' | 'account'
 type CompletedArchiveMode = 'week' | 'month'
+type EmployeeModalMode = 'view' | 'edit' | 'delete'
 
 const savedView = localStorage.getItem(STORAGE_KEYS.activeView) as ViewKey | null
 const savedTheme = localStorage.getItem(STORAGE_KEYS.theme) as ThemeMode | null
@@ -81,6 +84,8 @@ const statusFilter = ref<StatusFilter>('all')
 const showTaskComposer = ref(false)
 const showEmployeeComposer = ref(false)
 const editingTaskId = ref<string | null>(null)
+const employeeModalMode = ref<EmployeeModalMode | null>(null)
+const selectedEmployee = ref<Profile | null>(null)
 const taskActionMenuId = ref<string | null>(null)
 const savingTaskIds = ref(new Set<string>())
 const cancelDialogTask = ref<Task | null>(null)
@@ -107,6 +112,15 @@ const taskForm = reactive({
 })
 
 const employeeForm = reactive<EmployeeCreatePayload>({
+  full_name: '',
+  login_email: '',
+  password: '',
+  phone: '',
+  telegram_username: '',
+  role: 'employee'
+})
+
+const employeeEditForm = reactive<EmployeeCreatePayload>({
   full_name: '',
   login_email: '',
   password: '',
@@ -496,6 +510,31 @@ function resetEmployeeForm() {
   employeePasswordVisible.value = false
 }
 
+function fillEmployeeEditForm(employee: Profile) {
+  Object.assign(employeeEditForm, {
+    full_name: employee.full_name || '',
+    login_email: employee.login_email || '',
+    password: '',
+    phone: employee.phone || '',
+    telegram_username: employee.telegram_username || '',
+    role: employee.role || 'employee'
+  })
+}
+
+function openEmployeeModal(employee: Profile, mode: EmployeeModalMode) {
+  selectedEmployee.value = employee
+  employeeModalMode.value = mode
+  employeePasswordVisible.value = false
+  fillEmployeeEditForm(employee)
+}
+
+function closeEmployeeModal() {
+  selectedEmployee.value = null
+  employeeModalMode.value = null
+  employeeEditForm.password = ''
+  employeePasswordVisible.value = false
+}
+
 async function refreshData(options: { showLoader?: boolean; clearMessages?: boolean } = {}) {
   if (refreshPromise) return refreshPromise
 
@@ -648,6 +687,61 @@ async function submitEmployee() {
     await refreshData()
   } catch (error) {
     errorMessage.value = error instanceof Error ? error.message : t('employeeCreateError')
+  } finally {
+    saving.value = false
+  }
+}
+
+async function submitEmployeeEdit() {
+  const employee = selectedEmployee.value
+  if (!employee || !isManager.value) return
+
+  resetMessages()
+  if (
+    !employeeEditForm.full_name.trim() ||
+    normalizeLoginIdentifier(employeeEditForm.login_email).length < 3 ||
+    (employeeEditForm.password.trim() && employeeEditForm.password.trim().length < 6)
+  ) {
+    errorMessage.value = employeeEditForm.password.trim() ? t('passwordValidation') : t('employeeValidation')
+    return
+  }
+
+  saving.value = true
+  try {
+    const updated = await updateEmployee({
+      id: employee.id,
+      ...employeeEditForm,
+      full_name: employeeEditForm.full_name.trim(),
+      login_email: normalizeLoginIdentifier(employeeEditForm.login_email),
+      password: employeeEditForm.password.trim(),
+      telegram_username: normalizeTelegramUsername(employeeEditForm.telegram_username || '')
+    })
+    employees.value = employees.value.map((current) => (current.id === updated.id ? updated : current))
+    if (profile.value?.id === updated.id) profile.value = { ...profile.value, ...updated }
+    noticeMessage.value = t('employeeUpdated')
+    closeEmployeeModal()
+    await refreshData()
+  } catch (error) {
+    errorMessage.value = error instanceof Error ? error.message : t('employeeUpdateError')
+  } finally {
+    saving.value = false
+  }
+}
+
+async function confirmDeleteEmployee() {
+  const employee = selectedEmployee.value
+  if (!employee || !isManager.value) return
+
+  resetMessages()
+  saving.value = true
+  try {
+    await deleteEmployee(employee.id)
+    employees.value = employees.value.filter((current) => current.id !== employee.id)
+    noticeMessage.value = t('employeeDeleted')
+    closeEmployeeModal()
+    await refreshData()
+  } catch (error) {
+    errorMessage.value = error instanceof Error ? error.message : t('employeeDeleteError')
   } finally {
     saving.value = false
   }
@@ -864,6 +958,153 @@ watch(errorMessage, (message) => {
       @close="closeCancelDialog"
       @confirm="confirmCancelTask"
     />
+
+    <Transition name="panel-pop">
+      <div v-if="employeeModalMode && selectedEmployee" class="modal-scrim" @click.self="closeEmployeeModal">
+        <form
+          v-if="employeeModalMode === 'edit'"
+          class="modal-panel employee-modal"
+          @submit.prevent="submitEmployeeEdit"
+        >
+          <div class="employee-modal-head">
+            <div class="avatar large">
+              <img v-if="selectedEmployee.avatar_url" :src="selectedEmployee.avatar_url" alt="" />
+              <span v-else>{{ getInitials(selectedEmployee.full_name) }}</span>
+            </div>
+            <div>
+              <h2>{{ t('editEmployee') }}</h2>
+              <p>{{ selectedEmployee.full_name || selectedEmployee.login_email || '—' }}</p>
+            </div>
+            <button type="button" class="ghost-button icon-only" @click="closeEmployeeModal" :aria-label="t('close')">
+              <i class="bi bi-x-lg"></i>
+            </button>
+          </div>
+
+          <div class="form-grid">
+            <label>
+              {{ t('fullName') }}
+              <input v-model="employeeEditForm.full_name" :placeholder="t('fullNamePlaceholder')" />
+            </label>
+            <label>
+              {{ t('email') }}
+              <input v-model="employeeEditForm.login_email" autocomplete="username" />
+            </label>
+            <label>
+              {{ t('phone') }}
+              <input v-model="employeeEditForm.phone" placeholder="+998901234567" />
+            </label>
+            <label>
+              {{ t('telegram') }}
+              <input v-model="employeeEditForm.telegram_username" placeholder="@username" />
+            </label>
+            <label>
+              {{ t('role') }}
+              <select v-model="employeeEditForm.role">
+                <option value="employee">{{ t('employee') }}</option>
+                <option value="manager">{{ t('manager') }}</option>
+              </select>
+            </label>
+            <label>
+              {{ t('newPasswordOptional') }}
+              <div class="password-field">
+                <input
+                  v-model="employeeEditForm.password"
+                  :type="employeePasswordVisible ? 'text' : 'password'"
+                  autocomplete="new-password"
+                  :placeholder="t('newPasswordPlaceholder')"
+                />
+                <button
+                  type="button"
+                  class="password-toggle"
+                  :aria-label="employeePasswordVisible ? t('hidePassword') : t('showPassword')"
+                  @click="employeePasswordVisible = !employeePasswordVisible"
+                >
+                  <i :class="['bi', employeePasswordVisible ? 'bi-eye-slash' : 'bi-eye']"></i>
+                </button>
+              </div>
+            </label>
+          </div>
+
+          <div class="modal-actions">
+            <button type="button" class="ghost-button" @click="closeEmployeeModal">{{ t('close') }}</button>
+            <button class="primary-button fit" :disabled="saving">
+              <i class="bi bi-save"></i>
+              {{ saving ? '...' : t('saveChanges') }}
+            </button>
+          </div>
+        </form>
+
+        <section v-else-if="employeeModalMode === 'delete'" class="modal-panel employee-modal">
+          <div class="employee-modal-head">
+            <div class="employee-danger-icon">
+              <i class="bi bi-person-x"></i>
+            </div>
+            <div>
+              <h2>{{ t('deleteEmployee') }}</h2>
+              <p>{{ t('deleteEmployeeHelp') }}</p>
+            </div>
+            <button type="button" class="ghost-button icon-only" @click="closeEmployeeModal" :aria-label="t('close')">
+              <i class="bi bi-x-lg"></i>
+            </button>
+          </div>
+          <div class="employee-view-card danger">
+            <strong>{{ selectedEmployee.full_name || selectedEmployee.login_email || '—' }}</strong>
+            <span>{{ selectedEmployee.login_email || '—' }}</span>
+          </div>
+          <div class="modal-actions">
+            <button type="button" class="ghost-button" @click="closeEmployeeModal">{{ t('close') }}</button>
+            <button class="primary-button danger-button" :disabled="saving" @click="confirmDeleteEmployee">
+              <i class="bi bi-trash3"></i>
+              {{ saving ? '...' : t('delete') }}
+            </button>
+          </div>
+        </section>
+
+        <section v-else class="modal-panel employee-modal">
+          <div class="employee-modal-head">
+            <div class="avatar large">
+              <img v-if="selectedEmployee.avatar_url" :src="selectedEmployee.avatar_url" alt="" />
+              <span v-else>{{ getInitials(selectedEmployee.full_name) }}</span>
+            </div>
+            <div>
+              <h2>{{ selectedEmployee.full_name || selectedEmployee.login_email || '—' }}</h2>
+              <p>{{ roleLabel(selectedEmployee.role) }}</p>
+            </div>
+            <button type="button" class="ghost-button icon-only" @click="closeEmployeeModal" :aria-label="t('close')">
+              <i class="bi bi-x-lg"></i>
+            </button>
+          </div>
+          <dl class="detail-list employee-view-list">
+            <div>
+              <dt>{{ t('email') }}</dt>
+              <dd><i class="bi bi-person"></i>{{ selectedEmployee.login_email || '—' }}</dd>
+            </div>
+            <div>
+              <dt>{{ t('phone') }}</dt>
+              <dd><i class="bi bi-telephone"></i>{{ selectedEmployee.phone || '—' }}</dd>
+            </div>
+            <div>
+              <dt>{{ t('telegram') }}</dt>
+              <dd><i class="bi bi-telegram"></i>{{ displayTelegram(selectedEmployee.telegram_username) }}</dd>
+            </div>
+            <div>
+              <dt>{{ t('role') }}</dt>
+              <dd>{{ roleLabel(selectedEmployee.role) }}</dd>
+            </div>
+          </dl>
+          <div class="modal-actions">
+            <button type="button" class="ghost-button" @click="openEmployeeModal(selectedEmployee, 'edit')">
+              <i class="bi bi-pencil"></i>
+              {{ t('editEmployee') }}
+            </button>
+            <button type="button" class="ghost-button danger-text" @click="openEmployeeModal(selectedEmployee, 'delete')">
+              <i class="bi bi-trash3"></i>
+              {{ t('delete') }}
+            </button>
+          </div>
+        </section>
+      </div>
+    </Transition>
 
     <section v-if="isNotFoundRoute" class="not-found-screen">
       <div class="not-found-panel">
@@ -1391,6 +1632,22 @@ watch(errorMessage, (message) => {
                   <span class="employee-contact"><i class="bi bi-telegram"></i>{{
                     displayTelegram(employee.telegram_username)
                     }}</span>
+                  <div class="employee-actions">
+                    <button class="ghost-button icon-only" :aria-label="t('viewEmployee')" @click="openEmployeeModal(employee, 'view')">
+                      <i class="bi bi-eye"></i>
+                    </button>
+                    <button class="ghost-button icon-only" :aria-label="t('editEmployee')" @click="openEmployeeModal(employee, 'edit')">
+                      <i class="bi bi-pencil"></i>
+                    </button>
+                    <button
+                      class="ghost-button icon-only danger"
+                      :aria-label="t('deleteEmployee')"
+                      :disabled="employee.id === profile?.id"
+                      @click="openEmployeeModal(employee, 'delete')"
+                    >
+                      <i class="bi bi-trash3"></i>
+                    </button>
+                  </div>
                 </article>
               </div>
             </section>

@@ -367,6 +367,84 @@ button:disabled {
   font-weight: 800;
 }
 
+.employee-modal {
+  width: min(100%, 680px);
+}
+
+.employee-modal-head {
+  display: grid;
+  grid-template-columns: 56px minmax(0, 1fr) 40px;
+  align-items: center;
+  gap: 12px;
+}
+
+.employee-modal-head h2,
+.employee-modal-head p {
+  margin: 0;
+}
+
+.employee-modal-head h2 {
+  font-size: 18px;
+  line-height: 1.25;
+  overflow-wrap: anywhere;
+}
+
+.employee-modal-head p {
+  margin-top: 4px;
+  color: var(--muted);
+  font-size: 14px;
+  font-weight: 700;
+}
+
+.employee-modal label {
+  display: grid;
+  gap: 7px;
+  color: #334155;
+  font-size: 14px;
+  font-weight: 800;
+}
+
+.employee-danger-icon {
+  width: 52px;
+  height: 52px;
+  display: grid;
+  place-items: center;
+  border-radius: 12px;
+  background: var(--danger-soft);
+  color: var(--danger);
+  font-size: 22px;
+}
+
+.employee-view-card {
+  display: grid;
+  gap: 4px;
+  padding: 14px;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: var(--surface-soft);
+}
+
+.employee-view-card.danger {
+  border-color: #fecdd3;
+  background: var(--danger-soft);
+}
+
+.employee-view-card strong,
+.employee-view-card span {
+  min-width: 0;
+  overflow-wrap: anywhere;
+}
+
+.employee-view-card span {
+  color: var(--muted);
+  font-size: 13px;
+  font-weight: 800;
+}
+
+.employee-view-list {
+  gap: 0;
+}
+
 .modal-actions {
   display: flex;
   justify-content: flex-end;
@@ -1538,7 +1616,7 @@ textarea:focus {
 
 .employee-row {
   display: grid;
-  grid-template-columns: minmax(220px, 1fr) 110px minmax(130px, 150px) minmax(130px, 150px);
+  grid-template-columns: minmax(220px, 1fr) 110px minmax(130px, 150px) minmax(130px, 150px) 128px;
   align-items: center;
   gap: 12px;
   min-height: 68px;
@@ -1584,6 +1662,17 @@ textarea:focus {
 .employee-contact .bi {
   color: #8aa0bb;
   font-size: 14px;
+}
+
+.employee-actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 6px;
+}
+
+.employee-actions .icon-only {
+  width: 36px;
+  min-height: 36px;
 }
 
 .employees-panel {
@@ -2052,8 +2141,13 @@ textarea:focus {
     grid-template-columns: minmax(0, 1fr) auto;
   }
 
-  .employee-row .employee-contact {
+  .employee-row .employee-contact,
+  .employee-row .role-pill {
     display: none;
+  }
+
+  .employee-actions {
+    justify-content: flex-end;
   }
 }
 
@@ -2142,6 +2236,17 @@ textarea:focus {
 
   .employee-row {
     padding: 12px 14px;
+  }
+
+  .employee-modal-head {
+    grid-template-columns: 46px minmax(0, 1fr) 40px;
+  }
+
+  .employee-modal-head .avatar.large,
+  .employee-danger-icon {
+    width: 46px;
+    height: 46px;
+    font-size: 18px;
   }
 
   .profile-heading {
