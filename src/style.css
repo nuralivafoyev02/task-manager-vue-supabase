@@ -928,10 +928,39 @@ button:disabled {
   background: var(--line);
 }
 
-.metric-row div {
+.metric-card {
+  position: relative;
   min-height: 82px;
-  padding: 16px;
+  padding: 16px 56px 16px 16px;
   background: var(--surface);
+}
+
+.metric-card .bi {
+  position: absolute;
+  top: 16px;
+  right: 16px;
+  width: 34px;
+  height: 34px;
+  display: grid;
+  place-items: center;
+  border-radius: 8px;
+  background: var(--blue-soft);
+  color: var(--blue);
+}
+
+.metric-card.success .bi {
+  background: var(--success-soft);
+  color: var(--success);
+}
+
+.metric-card.danger .bi {
+  background: var(--danger-soft);
+  color: var(--danger);
+}
+
+.metric-card.people .bi {
+  background: var(--warning-soft);
+  color: var(--warning);
 }
 
 .metric-row span {
@@ -1101,6 +1130,20 @@ button:disabled {
   min-height: 42px;
 }
 
+.toolbar-meta {
+  min-height: 34px;
+  display: inline-flex;
+  align-items: center;
+  padding: 0 10px;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: var(--surface);
+  color: var(--muted);
+  font-size: 13px;
+  font-weight: 900;
+  white-space: nowrap;
+}
+
 .content-grid,
 .calendar-layout,
 .settings-layout {
@@ -1202,6 +1245,33 @@ button:disabled {
 .employee-table,
 .day-task-list {
   display: grid;
+}
+
+.task-table-head,
+.employee-table-head {
+  display: grid;
+  align-items: center;
+  gap: 12px;
+  min-height: 38px;
+  padding: 0 18px;
+  border-bottom: 1px solid var(--line);
+  background: var(--surface-soft);
+  color: var(--muted);
+  font-size: 12px;
+  font-weight: 900;
+}
+
+.task-table-head {
+  grid-template-columns: 30px minmax(160px, 1fr) 138px 128px 40px;
+}
+
+.employee-table-head {
+  grid-template-columns: minmax(220px, 1fr) 110px minmax(130px, 150px) minmax(130px, 150px) 128px;
+}
+
+.task-table-head span:last-child,
+.employee-table-head span:last-child {
+  text-align: right;
 }
 
 .task-table-panel {
@@ -2068,6 +2138,38 @@ textarea:focus {
   padding: 20px 0;
 }
 
+.app-loading,
+.rich-empty {
+  display: grid;
+  justify-items: center;
+  gap: 10px;
+}
+
+.app-loading .bi,
+.rich-empty > .bi {
+  width: 42px;
+  height: 42px;
+  display: grid;
+  place-items: center;
+  border-radius: 50%;
+  background: var(--blue-soft);
+  color: var(--blue);
+  font-size: 19px;
+}
+
+.rich-empty strong,
+.app-loading strong {
+  color: var(--text);
+  font-size: 15px;
+}
+
+.rich-empty span {
+  max-width: 360px;
+  color: var(--muted);
+  font-size: 14px;
+  line-height: 1.5;
+}
+
 .menu-button {
   display: none;
 }
@@ -2179,6 +2281,11 @@ textarea:focus {
     min-width: 0;
   }
 
+  .toolbar-meta {
+    width: 100%;
+    justify-content: center;
+  }
+
   .search-box {
     min-height: 46px;
   }
@@ -2195,6 +2302,11 @@ textarea:focus {
 
   .task-row {
     grid-template-columns: 28px minmax(0, 1fr) 40px;
+  }
+
+  .task-table-head,
+  .employee-table-head {
+    display: none;
   }
 
   .task-row.compact {

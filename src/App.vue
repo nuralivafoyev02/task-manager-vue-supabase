@@ -194,6 +194,8 @@ const filteredTasks = computed(() => {
   if (activeView.value === 'dashboard') return list.slice(0, 8)
   return list
 })
+const hasTaskFilters = computed(() => Boolean(searchQuery.value.trim()) || statusFilter.value !== 'all')
+const taskResultsText = computed(() => `${filteredTasks.value.length} / ${tasks.value.length} ${t('tasks')}`)
 
 const selectedTask = computed(() => {
   return tasks.value.find((task) => task.id === selectedTaskId.value) || filteredTasks.value[0] || null
@@ -290,6 +292,11 @@ function t(key: string) {
 function resetMessages() {
   errorMessage.value = ''
   noticeMessage.value = ''
+}
+
+function clearTaskFilters() {
+  searchQuery.value = ''
+  statusFilter.value = 'all'
 }
 
 function setTheme(mode: ThemeMode) {
@@ -1240,24 +1247,31 @@ watch(errorMessage, (message) => {
           </div>
         </header>
 
-        <section v-if="loading" class="empty-state">{{ t('loading') }}</section>
+        <section v-if="loading" class="empty-state app-loading">
+          <i class="bi bi-arrow-repeat spin"></i>
+          <strong>{{ t('loading') }}</strong>
+        </section>
 
         <Transition v-else name="view-slide" mode="out-in">
           <section v-if="activeView === 'dashboard' && isManager" key="dashboard" class="view-stack">
             <div class="metric-row">
-              <div>
+              <div class="metric-card">
+                <i class="bi bi-lightning-charge"></i>
                 <span>{{ t('active') }}</span>
                 <strong>{{ activeTasks.length }}</strong>
               </div>
-              <div>
+              <div class="metric-card success">
+                <i class="bi bi-check2-circle"></i>
                 <span>{{ t('completed') }}</span>
                 <strong>{{ completedTasks.length }}</strong>
               </div>
-              <div>
+              <div class="metric-card danger">
+                <i class="bi bi-exclamation-triangle"></i>
                 <span>{{ t('overdue') }}</span>
                 <strong>{{ overdueTasks.length }}</strong>
               </div>
-              <div>
+              <div class="metric-card people">
+                <i class="bi bi-people"></i>
                 <span>{{ t('employees') }}</span>
                 <strong>{{ employees.length }}</strong>
               </div>
@@ -1439,6 +1453,11 @@ watch(errorMessage, (message) => {
                 <option value="canceled">{{ t('canceled') }}</option>
                 <option value="overdue">{{ t('overdue') }}</option>
               </select>
+              <span class="toolbar-meta">{{ taskResultsText }}</span>
+              <button v-if="hasTaskFilters" class="ghost-button fit" @click="clearTaskFilters">
+                <i class="bi bi-x-circle"></i>
+                {{ t('clearFilters') }}
+              </button>
             </div>
 
             <div class="content-grid">
@@ -1451,8 +1470,27 @@ watch(errorMessage, (message) => {
                   </button>
                 </div>
 
-                <div v-if="!filteredTasks.length" class="empty-state">{{ t('noTasks') }}</div>
+                <div v-if="!filteredTasks.length" class="empty-state rich-empty">
+                  <i class="bi bi-check2-square"></i>
+                  <strong>{{ t('noTasks') }}</strong>
+                  <span>{{ hasTaskFilters ? t('emptyFilteredHelp') : t('emptyTasksHelp') }}</span>
+                  <button v-if="hasTaskFilters" class="ghost-button fit" @click="clearTaskFilters">
+                    <i class="bi bi-x-circle"></i>
+                    {{ t('clearFilters') }}
+                  </button>
+                  <button v-else class="primary-button fit" @click="showTaskComposer = true; resetTaskForm()">
+                    <i class="bi bi-plus-lg"></i>
+                    {{ t('newTask') }}
+                  </button>
+                </div>
                 <div v-else class="task-list">
+                  <div class="task-table-head">
+                    <span></span>
+                    <span>{{ t('title') }}</span>
+                    <span>{{ t('status') }}</span>
+                    <span>{{ t('dueDate') }}</span>
+                    <span>{{ t('actions') }}</span>
+                  </div>
                   <article v-for="task in filteredTasks" :key="task.id"
                     :class="['task-row', { selected: selectedTask?.id === task.id }]" @click="selectedTaskId = task.id">
                     <button class="status-dot" :class="taskDisplayStatus(task)"
@@ -1542,7 +1580,11 @@ watch(errorMessage, (message) => {
                   </div>
                 </template>
 
-                <div v-else class="empty-state">{{ t('noTasks') }}</div>
+                <div v-else class="empty-state rich-empty compact">
+                  <i class="bi bi-check2-square"></i>
+                  <strong>{{ t('noTasks') }}</strong>
+                  <span>{{ t('selectTaskHelp') }}</span>
+                </div>
               </aside>
             </div>
           </section>
@@ -1614,8 +1656,23 @@ watch(errorMessage, (message) => {
                 </button>
               </div>
 
-              <div v-if="!employees.length" class="empty-state">{{ t('noEmployees') }}</div>
+              <div v-if="!employees.length" class="empty-state rich-empty">
+                <i class="bi bi-people"></i>
+                <strong>{{ t('noEmployees') }}</strong>
+                <span>{{ t('emptyEmployeesHelp') }}</span>
+                <button class="primary-button fit" @click="showEmployeeComposer = true; resetEmployeeForm()">
+                  <i class="bi bi-person-plus"></i>
+                  {{ t('createEmployee') }}
+                </button>
+              </div>
               <div v-else class="employee-table">
+                <div class="employee-table-head">
+                  <span>{{ t('fullName') }}</span>
+                  <span>{{ t('role') }}</span>
+                  <span>{{ t('phone') }}</span>
+                  <span>{{ t('telegram') }}</span>
+                  <span>{{ t('actions') }}</span>
+                </div>
                 <article v-for="employee in employees" :key="employee.id" class="employee-row">
                   <div class="employee-identity">
                     <div class="avatar small">
@@ -1727,7 +1784,11 @@ watch(errorMessage, (message) => {
                 </div>
               </div>
 
-              <div v-if="!selectedCalendarTasks.length" class="empty-state compact">{{ t('calendarEmpty') }}</div>
+              <div v-if="!selectedCalendarTasks.length" class="empty-state rich-empty compact">
+                <i class="bi bi-calendar2-check"></i>
+                <strong>{{ t('calendarEmpty') }}</strong>
+                <span>{{ t('calendarEmptyHelp') }}</span>
+              </div>
               <div v-else class="day-task-list">
                 <article v-for="task in selectedCalendarTasks" :key="task.id"
                   @click="selectedTaskId = task.id; activeView = 'tasks'">
