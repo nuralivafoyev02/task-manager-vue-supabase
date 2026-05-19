@@ -970,11 +970,11 @@ watch(errorMessage, (message) => {
       <div v-if="employeeModalMode && selectedEmployee" class="modal-scrim" @click.self="closeEmployeeModal">
         <form
           v-if="employeeModalMode === 'edit'"
-          class="modal-panel employee-modal"
+          class="modal-panel employee-modal employee-modal-edit"
           @submit.prevent="submitEmployeeEdit"
         >
           <div class="employee-modal-head">
-            <div class="avatar large">
+            <div class="employee-modal-avatar">
               <img v-if="selectedEmployee.avatar_url" :src="selectedEmployee.avatar_url" alt="" />
               <span v-else>{{ getInitials(selectedEmployee.full_name) }}</span>
             </div>
@@ -1041,7 +1041,7 @@ watch(errorMessage, (message) => {
           </div>
         </form>
 
-        <section v-else-if="employeeModalMode === 'delete'" class="modal-panel employee-modal">
+        <section v-else-if="employeeModalMode === 'delete'" class="modal-panel employee-modal employee-modal-delete">
           <div class="employee-modal-head">
             <div class="employee-danger-icon">
               <i class="bi bi-person-x"></i>
@@ -1067,9 +1067,9 @@ watch(errorMessage, (message) => {
           </div>
         </section>
 
-        <section v-else class="modal-panel employee-modal">
+        <section v-else class="modal-panel employee-modal employee-modal-view">
           <div class="employee-modal-head">
-            <div class="avatar large">
+            <div class="employee-modal-avatar">
               <img v-if="selectedEmployee.avatar_url" :src="selectedEmployee.avatar_url" alt="" />
               <span v-else>{{ getInitials(selectedEmployee.full_name) }}</span>
             </div>

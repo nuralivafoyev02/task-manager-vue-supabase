@@ -92,7 +92,9 @@ button:disabled {
 .theme-dark .settings-index button,
 .theme-dark .ghost-button,
 .theme-dark .form-panel label,
-.theme-dark .settings-card label {
+.theme-dark .settings-card label,
+.theme-dark .employee-modal label,
+.theme-dark .cancel-reason-field {
   color: #d8e2f0;
 }
 
@@ -264,19 +266,22 @@ button:disabled {
   z-index: 90;
   display: grid;
   place-items: center;
-  padding: 18px;
-  background: rgba(15, 23, 42, 0.28);
+  padding: 24px;
+  background: rgba(15, 23, 42, 0.22);
+  backdrop-filter: blur(2px);
 }
 
 .modal-panel {
   width: min(100%, 520px);
   display: grid;
-  gap: 16px;
-  padding: 18px;
+  gap: 18px;
+  max-height: calc(100vh - 48px);
+  overflow-y: auto;
+  padding: 22px;
   border: 1px solid var(--line);
-  border-radius: 12px;
+  border-radius: 10px;
   background: var(--surface);
-  box-shadow: 0 24px 70px rgba(15, 23, 42, 0.18);
+  box-shadow: 0 28px 70px rgba(15, 23, 42, 0.16);
 }
 
 .modal-panel .section-header {
@@ -292,18 +297,18 @@ button:disabled {
 
 .modal-task-title {
   color: var(--text);
-  font-size: 15px;
+  font-size: 14px;
   overflow-wrap: anywhere;
 }
 
 .cancel-modal {
-  width: min(100%, 560px);
+  width: min(100%, 520px);
 }
 
 .cancel-modal-head {
   display: grid;
-  grid-template-columns: 44px minmax(0, 1fr) 40px;
-  align-items: start;
+  grid-template-columns: 40px minmax(0, 1fr) 38px;
+  align-items: center;
   gap: 12px;
 }
 
@@ -314,7 +319,7 @@ button:disabled {
 }
 
 .cancel-modal-head h2 {
-  font-size: 18px;
+  font-size: 17px;
   line-height: 1.25;
 }
 
@@ -322,39 +327,39 @@ button:disabled {
 .avatar-uploader p {
   margin-top: 5px;
   color: var(--muted);
-  font-size: 14px;
+  font-size: 13px;
   line-height: 1.5;
   font-weight: 600;
 }
 
 .cancel-modal-icon {
-  width: 44px;
-  height: 44px;
+  width: 40px;
+  height: 40px;
   display: grid;
   place-items: center;
-  border-radius: 12px;
+  border-radius: 10px;
   background: var(--danger-soft);
   color: var(--danger);
-  font-size: 20px;
+  font-size: 18px;
 }
 
 .cancel-task-preview {
   display: grid;
-  grid-template-columns: 34px minmax(0, 1fr);
+  grid-template-columns: 30px minmax(0, 1fr);
   align-items: center;
   gap: 10px;
-  padding: 12px;
+  padding: 10px;
   border: 1px solid var(--line);
   border-radius: 8px;
   background: var(--surface-soft);
 }
 
 .cancel-task-preview span {
-  width: 34px;
-  height: 34px;
+  width: 30px;
+  height: 30px;
   display: grid;
   place-items: center;
-  border-radius: 8px;
+  border-radius: 7px;
   background: white;
   color: var(--muted);
 }
@@ -368,14 +373,15 @@ button:disabled {
 }
 
 .employee-modal {
-  width: min(100%, 680px);
+  width: min(100%, 580px);
 }
 
 .employee-modal-head {
   display: grid;
-  grid-template-columns: 56px minmax(0, 1fr) 40px;
+  grid-template-columns: 44px minmax(0, 1fr) 38px;
   align-items: center;
   gap: 12px;
+  padding-bottom: 2px;
 }
 
 .employee-modal-head h2,
@@ -384,7 +390,7 @@ button:disabled {
 }
 
 .employee-modal-head h2 {
-  font-size: 18px;
+  font-size: 17px;
   line-height: 1.25;
   overflow-wrap: anywhere;
 }
@@ -392,33 +398,52 @@ button:disabled {
 .employee-modal-head p {
   margin-top: 4px;
   color: var(--muted);
-  font-size: 14px;
+  font-size: 13px;
   font-weight: 700;
+}
+
+.employee-modal-avatar {
+  overflow: hidden;
+  width: 44px;
+  height: 44px;
+  display: grid;
+  place-items: center;
+  border-radius: 50%;
+  background: var(--blue-soft);
+  color: var(--blue);
+  font-size: 14px;
+  font-weight: 900;
+}
+
+.employee-modal-avatar img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
 }
 
 .employee-modal label {
   display: grid;
   gap: 7px;
   color: #334155;
-  font-size: 14px;
+  font-size: 13px;
   font-weight: 800;
 }
 
 .employee-danger-icon {
-  width: 52px;
-  height: 52px;
+  width: 44px;
+  height: 44px;
   display: grid;
   place-items: center;
-  border-radius: 12px;
+  border-radius: 10px;
   background: var(--danger-soft);
   color: var(--danger);
-  font-size: 22px;
+  font-size: 19px;
 }
 
 .employee-view-card {
   display: grid;
   gap: 4px;
-  padding: 14px;
+  padding: 12px;
   border: 1px solid var(--line);
   border-radius: 8px;
   background: var(--surface-soft);
@@ -443,13 +468,53 @@ button:disabled {
 
 .employee-view-list {
   gap: 0;
+  overflow: hidden;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+}
+
+.employee-modal .detail-list div {
+  min-height: 46px;
+  display: grid;
+  grid-template-columns: minmax(120px, 0.75fr) minmax(0, 1fr);
+  align-items: center;
+  padding: 0 12px;
+  border-bottom: 0;
+  background: var(--surface);
+}
+
+.employee-modal .detail-list div + div {
+  border-top: 1px solid var(--line);
+}
+
+.employee-modal .detail-list dt {
+  font-size: 13px;
+}
+
+.employee-modal .detail-list dd {
+  display: inline-flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 7px;
+  min-width: 0;
+  font-size: 14px;
+}
+
+.employee-modal .detail-list dd .bi {
+  margin-right: 0;
 }
 
 .modal-actions {
   display: flex;
   justify-content: flex-end;
-  gap: 10px;
+  gap: 8px;
+  padding-top: 2px;
   flex-wrap: wrap;
+}
+
+.modal-actions .ghost-button,
+.modal-actions .primary-button {
+  min-height: 38px;
 }
 
 .danger-button {
